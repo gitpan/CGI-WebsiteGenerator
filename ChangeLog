@@ -1,3 +1,35 @@
+2001-03-18   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.34.
+	
+	* This release is the first one that includes the CPAN standard files 
+	"Makefile.PL", "test.pl", and "MANIFEST", which were all created following 
+	the previous release.  The content of "Manifest" was previously inside the 
+	"ReadMe" file.  Improved the install instructions in my ReadMe file.
+
+	* Note that "test.pl" is incomplete; it only tests that these modules will 
+	compile but not that the methods work; it is included so that people can use 
+	the Makefile in the standard way during installation.  As this distribution 
+	splits up in the future, each piece will have a fleshed-out "test.pl".
+
+	* This release takes into account any of the changes that happened to other 
+	modules that this distribution requires.  See the details below.
+	
+	* Updated the persistant_user_input_string() method of WebUserIO to account 
+	for public interface changes in CGI::MultiValuedHash that broke it.
+	
+	* Updated the content_as_string() method of PageMaker to make use of new 
+	functionality in HTML::EasyTags; content_as_string() is now implemented with 
+	fewer lines of code as a result.
+	
+	* Updated CGI::WPM::SequentialFile to make use of new functionality that was 
+	added to CGI::MultiValuedHash.  Specifically, the read_records() and 
+	write_records() methods were dropped, since CMVH's new batch_from_file() and 
+	batch_to_file() can do all of the same work.  Similarly, other parts of 
+	SequentialFile that used those methods were updated.
+	
+	* I resynced versions for all of the other modules that needed it.
+
 2001-01-05   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.33.

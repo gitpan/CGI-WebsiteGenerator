@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.33';
+$VERSION = '0.34';
 
 ######################################################################
 
@@ -36,15 +36,15 @@ $VERSION = '0.33';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::WebUserIO 0.93
-	CGI::WPM::PageMaker 1.01
+	CGI::WPM::WebUserIO 0.94
+	CGI::WPM::PageMaker 1.02
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::WebUserIO 0.93;
-use CGI::WPM::PageMaker 1.01;
+use CGI::WPM::WebUserIO 0.94;
+use CGI::WPM::PageMaker 1.02;
 @ISA = qw( CGI::WPM::WebUserIO CGI::WPM::PageMaker );
 
 ######################################################################

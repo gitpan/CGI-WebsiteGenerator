@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.33';
+$VERSION = '0.34';
 
 ######################################################################
 
@@ -34,14 +34,14 @@ $VERSION = '0.33';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.33
-	CGI::WPM::Globals 0.33
+	CGI::WPM::Base 0.34
+	CGI::WPM::Globals 0.34
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.33;
+use CGI::WPM::Base 0.34;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
@@ -62,7 +62,7 @@ use CGI::WPM::Base 0.33;
 =head2 Display A Plain Text File -- HTML Escaped
 
 	$globals->move_site_prefs( {filename => 'mycode.txt', is_text => 1} );
-	
+
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.03';
+$VERSION = '1.04';
 
 ######################################################################
 
@@ -35,7 +35,7 @@ $VERSION = '1.03';
 
 =head2 Nonstandard Modules
 
-	CGI::MultiValuedHash 1.03
+	CGI::MultiValuedHash 1.06
 
 =cut
 
@@ -43,7 +43,7 @@ $VERSION = '1.03';
 
 use Fcntl qw(:DEFAULT :flock);
 use Symbol;
-use CGI::MultiValuedHash 1.03;
+use CGI::MultiValuedHash 1.06;
 
 ######################################################################
 
@@ -505,107 +505,6 @@ sub unlock_and_close {
 
 ######################################################################
 
-=head2 read_records([ CASE[, MAX[, EMPTY]] ])
-
-This method reads records from this object's "file handle", and returns them. 
-The second optional scalar argument specifies the maximum number of records to
-read.  If that argument is undefined or less than 1, then all records are read
-until the end-of-file is reached.  The first and third optional arguments, CASE
-and EMPTY, will override the object properties "ignores case" and "use empty" if
-defined.  This method returns an ARRAY ref containing the new records (as MVHs)
-on success, even if the end-of-file is reached before we find any records.  It
-returns undef on a file-system error, even if some records were read first.
-
-=cut
-
-######################################################################
-
-sub read_records {
-	my $self = shift( @_ );
-	my $fh = $self->{$KEY_FILEHANDLE};
-	my $case_inse = shift( @_ );
-	my $max_rec_num = shift( @_ );  # if <= 0, read all records
-	my $use_empty = shift( @_ );
-	
-	defined( $case_inse ) or $case_inse = $self->{$KEY_CASE_INSE};
-	defined( $use_empty ) or $use_empty = $self->{$KEY_USE_EMPTY};
-	
-	$self->{$KEY_IS_ERROR} = undef;
-
-	my @record_list = ();
-	my $remaining_rec_count = ($max_rec_num <= 0) ? -1 : $max_rec_num;
-
-	GET_ANOTHER_REC: {
-		eof( $fh ) and last;
-
-		my $record = CGI::MultiValuedHash->new( $case_inse );
-
-		defined( $record->from_file( $fh, $DELIM_FIELDS, undef, 
-				$DELIM_RECORDS, $use_empty ) ) or do {
-			$self->_make_filesystem_error( "read record from" );
-			return( undef );
-		};
-
-		push( @record_list, $record );
-
-		--$remaining_rec_count != 0 and redo GET_ANOTHER_REC;
-	}	
-	
-	# if file is of nonzero length and contains no records, or if it has a 
-	# record separator followed by no records, then we would end up with an 
-	# empty last record in our list even if empty records aren't allowed, 
-	# so we get rid of said disallowed here
-	if( !$use_empty and @record_list and !$record_list[-1]->keys_count() ) {
-		pop( @record_list );
-	}
-	
-	return( \@record_list );
-}
-
-######################################################################
-
-=head2 write_records( LIST[, EMPTY] )
-
-This method writes records to this object's "file handle".  The first argument,
-LIST, is an ARRAY ref containing the records (as MVHs or HASH refs) to be
-written, or it is a single record to be written.  If any array elements aren't
-MVHs or HASH refs, they are disregarded.  The second, optional argument, EMPTY,
-will override the object's "use empty" property if defined.  This method returns
-1 on success, even if there are no records to write.  It returns undef on a
-file-system error, even if some of the records were written first.
-
-=cut
-
-######################################################################
-
-sub write_records {
-	my $self = shift( @_ );
-	my $fh = $self->{$KEY_FILEHANDLE};
-	my $ra_record_list = shift( @_ );
-	my $use_empty = shift( @_ );
-	
-	ref( $ra_record_list ) eq 'ARRAY' or $ra_record_list = [];
-	defined( $use_empty ) or $use_empty = $self->{$KEY_USE_EMPTY};
-	
-	$self->{$KEY_IS_ERROR} = undef;
-
-	foreach my $record (@{$ra_record_list}) {
-		ref( $record ) eq 'HASH' and $record = 
-			CGI::MultiValuedHash->new( 0, $record );
-		ref( $record ) eq "CGI::MultiValuedHash" or next;
-		
-		defined( $record->to_file( $fh, $DELIM_FIELDS, undef, 
-				$DELIM_RECORDS, $use_empty ) ) or do {
-			$self->_make_filesystem_error( "write record to" );
-			return( undef );
-		};
-	}
-	
-	return( 1 );
-}
-
-######################################################################
-
 =head2 fetch_all_records([ CASE ])
 
 This method will return a list containing all the records from a file, which may
@@ -631,8 +530,12 @@ sub fetch_all_records {
 		return( undef );
 	};
 
-	my $ra_record_list = $self->read_records( $case_inse, -1 ) 
-		or return( undef );
+	my $ra_record_list = CGI::MultiValuedHash->batch_from_file( $fh, 
+			$self->{$KEY_CASE_INSE}, -1, $DELIM_FIELDS, 
+			undef, $DELIM_RECORDS, $self->{$KEY_USE_EMPTY} ) or do {
+		$self->_make_filesystem_error( "read record from" );
+		return( undef );
+	};
 
 	$self->unlock_and_close() or return( undef );
 
@@ -665,7 +568,11 @@ sub append_new_records {
 		return( undef );
 	};
 
-	$self->write_records( $ra_record_list ) or return( undef );
+	CGI::MultiValuedHash->batch_to_file( $fh, $ra_record_list, $DELIM_FIELDS, 
+			undef, $DELIM_RECORDS, $self->{$KEY_USE_EMPTY} ) or do {
+		$self->_make_filesystem_error( "write record to" );
+		return( undef );
+	};
 
 	$self->unlock_and_close() or return( undef );
 
@@ -705,7 +612,11 @@ sub replace_all_records {
 		return( undef );
 	};
 
-	$self->write_records( $ra_record_list ) or return( undef );
+	CGI::MultiValuedHash->batch_to_file( $fh, $ra_record_list, $DELIM_FIELDS, 
+			undef, $DELIM_RECORDS, $self->{$KEY_USE_EMPTY} ) or do {
+		$self->_make_filesystem_error( "write record to" );
+		return( undef );
+	};
 
 	$self->unlock_and_close() or return( undef );
 
@@ -784,6 +695,6 @@ the flexability to create nonexistant files on demand.
 
 =head1 SEE ALSO
 
-perl(1), Boulder, CGI, CGI::MultiValuedHash.
+perl(1), CGI::MultiValuedHash, Boulder, CGI.
 
 =cut

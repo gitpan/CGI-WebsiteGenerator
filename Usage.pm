@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.33';
+$VERSION = '0.34';
 
 ######################################################################
 
@@ -34,15 +34,15 @@ $VERSION = '0.33';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.33
-	CGI::WPM::Globals 0.33
+	CGI::WPM::Base 0.34
+	CGI::WPM::Globals 0.34
 	CGI::WPM::EventCountFile 1.04
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.33;
+use CGI::WPM::Base 0.34;
 @ISA = qw(CGI::WPM::Base);
 use CGI::WPM::EventCountFile 1.04;
 
@@ -218,15 +218,21 @@ my $RKEY_USE_DEF_ENGINES = 'use_def_engines'; # if true, use our own se list
 # They are all lowercased here for simplicity.  It's not complete, but I 
 # learned these engines because they linked to my web sites.
 my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
-	alltheweb => 'query', #
+	alltheweb => 'query', # AllTheWeb
 	altavista => 'q',     # Altavista
 	'aj.com' => 'ask',    # Ask Jeeves
 	aol => 'query',       # America Online
-	'c4.com' => 'searchtext', #
+	'ask.com' => 'ask',   # Ask Jeeves
+	askjeeves => 'ask',   # Ask Jeeves
+	'c4.com' => 'searchtext', # C4
 	'cs.com' => 'sterm',  # CompuServe
 	dmoz => 'search',     # Mozilla Open Directory
 	dogpile => 'q',       # DogPile
+	excite => 's',        # Excite
 	google => 'q',        # Google
+	'goto.com' => 'keywords', # GoTo.com, Inc
+	'icq.com' => 'query', # ICQ
+	infogrid => 'search', # InfoGrid
 	intelliseek => 'queryterm', # "Infrastructure For Intelligent Portals"
 	iwon => 'searchfor',  # I Won
 	looksmart => 'key',   # LookSmart
@@ -239,6 +245,7 @@ my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
 	ninemsn => 'q',       # nine msn
 	northernlight => 'qr', # Northern Light Search
 	'search.com' => 'q',  # CNET
+	'searchalot' => 'search', # SearchALot
 	snap => 'keyword',    # Microsoft
 	webcrawler => 'search', # Webcrawler
 	yahoo => 'p',         # Yahoo
@@ -381,7 +388,7 @@ sub update_site_vrp_counts {
 	
 	# save which page within this site was hit
 	$self->update_one_count_file( $filename, 
-		lc( $globals->user_vrp_string() ), 
+		$globals->user_vrp_string(), 
 		$globals->redirect_url() ? $t_rd : () );
 }
 
@@ -398,7 +405,7 @@ sub update_redirect_counts {
 	my $filename = $rh_log_prefs->{$LKEY_FILENAME} or return( 0 );
 	
 	# save which url this site referred the visitor to, if any
-	$self->update_one_count_file( $filename, lc( $globals->redirect_url() ) );
+	$self->update_one_count_file( $filename, $globals->redirect_url() );
 }
 
 ######################################################################
@@ -436,7 +443,7 @@ sub update_referrer_counts {
 	my (@ref_norm, @ref_sear, @ref_keyw, @ref_disc);
 
 	SWITCH: {
-		my $referer = lc( $globals->http_referer() );
+		my $referer = $globals->http_referer();
 		my ($ref_filename, $query) = split( /\?/, $referer, 2 );
 		$ref_filename =~ s|/$||;     # lose trailing "/"s
 		$referer = ($query =~ /[a-zA-Z0-9]/) ? 
@@ -446,7 +453,7 @@ sub update_referrer_counts {
 		
 		# first check if visitor is moving within our own site
 		foreach my $synonym (@{$ra_site_urls}) {
-			if( $ref_filename eq lc($synonym) ) {
+			if( lc($ref_filename) eq lc($synonym) ) {
 				push( @ref_norm, $t_rfs );
 				push( @ref_sear, $t_rfs );
 				push( @ref_keyw, $t_rfs );
@@ -457,7 +464,7 @@ sub update_referrer_counts {
 
 		# else check if visitor came from checking an e-mail online
 		foreach my $ident (@{$ra_discards}) {
-			if( $ref_filename =~ m|$ident| ) {
+			if( $ref_filename =~ m|$ident|i ) {
 				push( @ref_norm, $t_rfo );
 				push( @ref_sear, $t_rfo );
 				push( @ref_keyw, $t_rfo );

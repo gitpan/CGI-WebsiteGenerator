@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.01';
+$VERSION = '1.02';
 
 ######################################################################
 
@@ -34,7 +34,7 @@ $VERSION = '1.01';
 
 =head2 Nonstandard Modules
 
-	HTML::EasyTags 1.02  # required in content_as_string() method only
+	HTML::EasyTags 1.0301  # required in content_as_string() method only
 
 =head1 SYNOPSIS
 
@@ -77,7 +77,7 @@ $VERSION = '1.01';
 	__endquote
 
 	print STDOUT $webpage->content_as_string();
-	
+
 =head1 DESCRIPTION
 
 This Perl 5 object class implements a simple data structure that makes it easy to
@@ -625,8 +625,6 @@ sub content_as_string {
 
 	my ($title,$author,$meta,$css_src,$css_code);
 
-	$title = $html->title( $self->{$KEY_TITLE} || 'Untitled Document' );
-
 	$self->{$KEY_AUTHOR} and $author = 
 		$html->link( rev => 'made', href => "mailto:$self->{$KEY_AUTHOR}" );
 
@@ -641,20 +639,13 @@ sub content_as_string {
 		$html->style( $html->comment_tag( $self->{$KEY_CSS_CODE} ) );
 
 	return( join( '', 
-		$html->prologue_tag(),
-		$html->html_start(),
-		$html->head_start(),
-
-		$title.$author.$meta.$css_src.$css_code,
-		@{$self->{$KEY_MAIN_HEAD}},
-
-		$html->head_end(),
-		$html->body_start( $self->{$KEY_BODY_ATTR} ),
-
+		$html->start_html(
+			$self->{$KEY_TITLE},
+			[ $author, $meta, $css_src, $css_code, @{$self->{$KEY_MAIN_HEAD}} ], 
+			$self->{$KEY_BODY_ATTR}, 
+		), 
 		@{$self->{$KEY_MAIN_BODY}},
-
-		$html->body_end(),
-		$html->html_end(),
+		$html->end_html(),
 	) );
 }
 
@@ -680,6 +671,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), HTML::EasyTags.
+perl(1), HTML::EasyTags, CGI::WPM::Globals.
 
 =cut

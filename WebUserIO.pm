@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.93';
+$VERSION = '0.94';
 
 ######################################################################
 
@@ -37,13 +37,13 @@ $VERSION = '0.93';
 
 =head2 Nonstandard Modules
 
-	CGI::MultiValuedHash 1.03
+	CGI::MultiValuedHash 1.06
 
 =cut
 
 ######################################################################
 
-use CGI::MultiValuedHash 1.03;
+use CGI::MultiValuedHash 1.06;
 
 ######################################################################
 
@@ -426,7 +426,7 @@ sub persistant_user_input_params {
 
 sub persistant_user_input_string {
 	my $self = shift( @_ );
-	return( $self->{$KEY_USER_INPUT}->clone( undef, 
+	return( $self->{$KEY_USER_INPUT}->fetch_mvh( 
 		[keys %{$self->{$KEY_PERSIST_QUERY}}] 
 		)->to_url_encoded_string() );
 }
@@ -604,7 +604,7 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), mod_perl, CGI::MultiValuedHash, HTTP::Headers, Apache.
+perl(1), mod_perl, CGI::MultiValuedHash, HTTP::Headers, Apache, CGI::WPM::Globals.
 
 =cut
 

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.33';
+$VERSION = '0.34';
 
 ######################################################################
 
@@ -34,19 +34,19 @@ $VERSION = '0.33';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.33
-	CGI::WPM::Globals 0.33
-	HTML::FormTemplate 1.02
-	CGI::MultiValuedHash 1.03
-	CGI::WPM::SequentialFile 1.03 (optional)
+	CGI::WPM::Base 0.34
+	CGI::WPM::Globals 0.34
+	HTML::FormTemplate 1.05
+	CGI::MultiValuedHash 1.06
+	CGI::WPM::SequentialFile 1.04 (optional)
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.33;
+use CGI::WPM::Base 0.34;  # uses Globals 0.34
 @ISA = qw(CGI::WPM::Base);
-use HTML::FormTemplate 1.02;
+use HTML::FormTemplate 1.05;  # uses CMVH 1.06
 
 ######################################################################
 

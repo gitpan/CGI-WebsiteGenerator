@@ -1,4 +1,4 @@
-                     DYNAMIC WEBSITE GENERATOR
+                    DYNAMIC WEBSITE GENERATOR
 ----------------------------------------------------------------------
 
 by Darren Duncan <perl@DarrenDuncan.net>
@@ -6,7 +6,6 @@ by Darren Duncan <perl@DarrenDuncan.net>
 CONTENTS
 
 * Preface
-* Manifest
 * Description
 * Keeping Up To Date
 * Requirements
@@ -31,25 +30,7 @@ description of the modules themselves.  Look at CGI::WPM::Globals and
 CGI::WPM::Base in particular because they are the core of the system.
 
 This Read Me document concerns itself mainly with installation and support
-issues, and also includes any "To Do" lists and the file manifest.
-
-MANIFEST
-
-Base.pm
-ChangeLog
-EventCountFile.pm
-Globals.pm
-GuestBook.pm
-MailForm.pm
-MultiPage.pm
-PageMaker.pm
-ReadMe
-Redirect.pm
-SegTextDoc.pm
-SequentialFile.pm
-Static.pm
-Usage.pm
-WebUserIO.pm
+issues, and also includes a "To Do" list and other overview documentation.
 
 DESCRIPTION
 
@@ -100,26 +81,29 @@ changed.
 REQUIREMENTS
 
 All of my modules require Perl 5.004 or newer, even though only some of them need
-it, in the interest of consistency.  Modules in this distribution require modules 
-in these following distributions:
+it, in the interest of consistency.  That said, Perl 5.004 is already 3 years 
+old, is available as a binary on practically every OS that supports Perl at all, 
+and is a very solid release, so I see no reason to support anything older.
 
-MultiValuedHash-1.03.tar.gz
+Modules in this distribution require modules in these following distributions:
+
+HTML-EasyTags-1.0301.tar.gz
 	- by Darren Duncan (DUNCAND)
-	- CGI::MultiValuedHash 1.03 is required by:
+	- HTML::EasyTags 1.0301 is required by:
+		- CGI::WPM::PageMaker (when assembling a final HTML page only)
+		- Anything that uses PageMaker except when redirection headers and usage
+
+MultiValuedHash-1.06.tar.gz
+	- by Darren Duncan (DUNCAND)
+	- CGI::MultiValuedHash 1.06 is required by:
 		- CGI::WPM::WebUserIO (parsing user input)
 		- CGI::WPM::SequentialFile (for serializing file data)
 		- CGI::WPM::Globals (inherits WebUserIO)
 		- Anything that uses FormTemplate
 
-HTML-EasyTags-1.02.tar.gz
+HTML-FormTemplate-1.05.tar.gz
 	- by Darren Duncan (DUNCAND)
-	- HTML::EasyTags 1.02 is required by:
-		- CGI::WPM::PageMaker (when assembling a final HTML page only)
-		- Anything that uses PageMaker except when redirection headers and usage
-
-HTML-FormTemplate-1.02.tar.gz
-	- by Darren Duncan (DUNCAND)
-	- HTML::FormTemplate 1.02 is required by:
+	- HTML::FormTemplate 1.05 is required by:
 		- CGI::WPM::MailForm (for making input forms and form reports)
 		- CGI::WPM::GuestBook (for making input forms and form reports)
 
@@ -128,30 +112,52 @@ libnet-1.0703.tar.gz (older versions may work):
 	- Net::SMTP 2.15 is required by:
 		- CGI::WPM::Globals (when sending e-mails of form or usage data)
 		- Anything that uses Globals
-	
+
 libwww-perl-5.48.tar.gz (older versions may work):
 	- by Gisle Aas (GAAS)
 	- HTTP::Headers 1.37 is required by:
 		- CGI::WPM::WebUserIO (when outputting http headers to the user)
-		
+
 mod_perl-1.24_01.tar.gz (older versions may work):
 	- Apache 1.27 is required by:
 		- CGI::WPM::WebUserIO (when running under mod_perl)
 
 INSTALLATION
 
-I haven't gotten around to doing makefiles, so you will have to install this the
-old fashioned way, by copying.  All of the ".pm" files in this distribution go 
-inside the temporary folder "WPM", which is inside "CGI", which is in the "lib" 
-folder that came with your Perl 5 distribution.  Or alternately, put it anywhere 
-you want, but you will need to have that location added to your include path by 
-your main program using something like this:
+To install this module, cd to the directory that contains all of the extracted 
+distribution files, including this ReadMe file, and type the following:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+The last step probably won't work if you are not the administrator of your 
+machine; in that case you either need to get your administrator to install this 
+for you, or put it in a your own local directory instead.
+
+If you are on a Mac system and/or you are otherwise having problems with the 
+Makefile, you can still install this module the old fashioned way, by copying.
+
+All of the ".pm" files in this distribution go inside the temporary folder "WPM",
+which is inside "CGI", which is in the "lib" folder that came with your Perl 5
+distribution.
+
+Or alternately, put it anywhere you want, but you will need to have that 
+location added to your include path by your main program using something like 
+this:
 
 	use lib '/users/me/www_files/lib';
 
-Any existing POD is embedded in the module itself, so you will have to look there
-to see it, or run a POD extractor on it yourself, or look at the copy on CPAN
-that is dutifully extracted and turned to HTML.
+Then you would want to run the included test program to make sure the module is 
+installed correctly.  Call it with:
+
+	perl test.pl
+
+Any existing POD is embedded in the module itself.  The Makefile probably 
+extracted it for you in the usual manner, or you can run a POD extractor on it 
+yourself to the same effect.  You can also find an HTMLized copy of the POD on 
+CPAN and other public source archives; I link to one copy of it on my web site.
 
 MODULE LIST
 
@@ -320,14 +326,15 @@ SUPPORT
 
 Currently I don't have any support arranged with other people, lists, newsgroups,
 or otherwise.  Feel free to ask me if you can't figure things out on your own, or
-another person whom you know has used this.
+another person whom you know has used this.  I may start a mailing list for 
+support issues later, so that users of my modules can help each other with them.
 
 TO DO
 
 	* Break the distribution up into several different ones, separating the 
 	generic functionality from the proprietary.  To date, 5 generic modules have 
 	already been split off into their own 4 distributions: Class-ParamParser, 
-	MultiValuedHash, HTML-EasyTags, HTML-FormTemplate.  Others will follow...
+	HTML-EasyTags, MultiValuedHash, HTML-FormTemplate.  Others will follow...
 
 PROGRAM EXAMPLE
 
@@ -450,3 +457,4 @@ send me a copy so that I can roll desirable changes into the main release.
 Address comments, suggestions, and bug reports to perl@DarrenDuncan.net.
 
 Share and Enjoy!
+

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.33';
+$VERSION = '0.34';
 
 ######################################################################
 
@@ -34,14 +34,14 @@ $VERSION = '0.33';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.33
-	CGI::WPM::Globals 0.33
+	CGI::WPM::Base 0.34
+	CGI::WPM::Globals 0.34
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.33;
+use CGI::WPM::Base 0.34;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
