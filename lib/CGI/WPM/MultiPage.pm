@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.3001';
 
 ######################################################################
 
@@ -36,14 +36,14 @@ $VERSION = '0.3';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base
-	CGI::WPM::Globals
+	CGI::WPM::Base 0.31
+	CGI::WPM::Globals 0.3
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base;
+use CGI::WPM::Base 0.31;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
@@ -195,7 +195,7 @@ __endquote
 
 		$wpm->dispatch_by_user();
 
-		$wpm->finalize_page_content();
+		$wpm->finalize();
 	};
 
 	$globals->restore_site_prefs();

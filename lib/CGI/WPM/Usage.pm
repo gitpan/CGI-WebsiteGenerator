@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.3001';
 
 ######################################################################
 
@@ -34,15 +34,15 @@ $VERSION = '0.3';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base
-	CGI::WPM::Globals
+	CGI::WPM::Base 0.31
+	CGI::WPM::Globals 0.3
 	CGI::EventCountFile 1.01
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base;
+use CGI::WPM::Base 0.31;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
@@ -145,6 +145,7 @@ my $UKEY_T_REF_JUNK = 't_ref_junk'; # someone read their e-mail/news in wb
 # learned these engines because they linked to my web sites.
 my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
 	altavista => 'q',     # Altavista
+	'aj.com' => 'ask',    # Ask Jeeves
 	aol => 'query',       # America Online
 	'cs.com' => 'sterm',  # CompuServe
 	dmoz => 'search',     # Mozilla Open Directory
@@ -153,11 +154,15 @@ my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
 	intelliseek => 'queryterm', # "Infrastructure For Intelligent Portals"
 	iwon => 'searchfor',  # I Won
 	looksmart => 'key',   # LookSmart
+	lycos => 'query',     # Lycos
 	mamma => 'query',     # "Mother of Search Engines"
 	msn => ['q','mt'],    # Microsoft
+	nbci => 'keyword',    # NBCi
 	netscape => 'search', # Netscape
+	ninemsn => 'q',       # nine msn
 	'search.com' => 'q',  # CNET
 	snap => 'keyword',    # Microsoft
+	webcrawler => 'search', # Webcrawler
 	yahoo => 'p',         # Yahoo
 );
 
@@ -237,7 +242,7 @@ sub get_inner_wpm_content {
 
 		$wpm->dispatch_by_user();
 		
-		$wpm->finalize_page_content();
+		$wpm->finalize();
 	};
 
 	$globals->restore_site_prefs();

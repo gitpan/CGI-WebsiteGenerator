@@ -35,20 +35,20 @@ $VERSION = '0.3';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base
-	CGI::WPM::Globals
-	HTML::FormMaker
+	CGI::WPM::Base 0.3
+	CGI::WPM::Globals 0.3
+	HTML::FormMaker 1.0
 	CGI::HashOfArrays 1.01
-	CGI::SequentialFile
+	CGI::SequentialFile 1.0
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base;
+use CGI::WPM::Base 0.3;
 @ISA = qw(CGI::WPM::Base);
-use HTML::FormMaker;
-use CGI::SequentialFile;
+use HTML::FormMaker 1.0;
+use CGI::SequentialFile 1.0;
 
 ######################################################################
 

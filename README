@@ -48,27 +48,23 @@ included in your Perl distribution then you will need to obtain them from CPAN.
 The versions below were the newest as of April of 2000.  Some of these are
 optional, so take them as your needs require:
 
-CGI-FormGenerator-0.9.tar.gz:
+CGI-FormGenerator-0.91.tar.gz:
 	- by Darren Duncan <perl@DarrenDuncan.net>
 	- these modules are always used:
-		- CGI::WebUserInput 0.9
-		- CGI::WebUserOutput 0.9
-		- CGI::HashOfArrays 1.01
+		- CGI::WebUserInput 0.91
+		- CGI::WebUserOutput 0.91
+		- CGI::HashOfArrays 1.02
 	- these modules are optionally used:
-		- HTML::TagMaker 1.0 (for anything except redirection headers and usage)
-		- HTML::FormMaker 1.0 (for making input forms and form reports)
-		- CGI::SequentialFile 1.0 (for saving guest book messages in files; form
+		- HTML::TagMaker 1.01 (for anything except redirection headers and usage)
+		- HTML::FormMaker 1.01 (for making input forms and form reports)
+		- CGI::SequentialFile 1.01 (for saving guest book messages in files; form
 definitions may optionally be stored in this type of file as well)
+		- CGI::EventCountFile 1.02 (for saving usage data in files)
 
 libnet-1.0703.tar.gz:
 	- by Graham Barr <gbarr@pobox.com>
 	- this module is optionally used:
 		- Net::SMTP 2.15 (for sending e-mails of form or usage data)
-
-EventCountFile-1.0.tar.gz:
-	- by Darren Duncan <perl@DarrenDuncan.net>
-	- this module is optionally used:
-		- CGI::EventCountFile 1.01 (for saving usage data in files)
 
 Older versions of modules that I didn't make may work as well, but I haven't
 tried using them so do it at your own risk.

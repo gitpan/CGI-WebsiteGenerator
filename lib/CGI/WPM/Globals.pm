@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.31';
 
 ######################################################################
 
@@ -36,15 +36,15 @@ $VERSION = '0.3';
 
 =head2 Nonstandard Modules
 
-	CGI::WebUserInput
-	CGI::WebUserOutput
+	CGI::WebUserInput 0.91
+	CGI::WebUserOutput 0.91
 
 =cut
 
 ######################################################################
 
-use CGI::WebUserInput;
-use CGI::WebUserOutput;
+use CGI::WebUserInput 0.91;
+use CGI::WebUserOutput 0.91;
 @ISA = qw( CGI::WebUserInput CGI::WebUserOutput );
 
 ######################################################################
@@ -67,14 +67,14 @@ and B<$object-E<gt>method()> for methods.
 
 This module inherits the full public interfaces and functionality of both 
 CGI::WebUserInput and CGI::WebUserOutput, so the POD in those modules is also 
-applicable to this one.  However, the new() and initialize() methods of those 
-modules are overridden by ones defined in this one.  Also, the clone() method 
-defined in CGI::WebUserOutput is not overridden and should not be used.
+applicable to this one.  However, the new() and initialize() and clone() methods 
+of those modules are overridden by ones defined in this one.
 
 I<This POD is coming when I get the time to write it.>
 
 	new([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
 	initialize([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
+	clone([ CLONE ]) -- POD for this available below
 
 	is_debug([ NEW_VALUE ])
 
@@ -142,10 +142,6 @@ I<This POD is coming when I get the time to write it.>
 
 ######################################################################
 
-# This property is set only once because it corresponds to user 
-# input that can only be gathered prior to this program starting up.
-my $KEY_INITIAL_UI = 'ui_initial_user_input';  # for parent user input
-
 # Names of properties for objects of this class are declared here:
 
 # This property is set by the calling code and may affect how certain 
@@ -179,12 +175,6 @@ my $KEY_VRP_STACK   = 'vrp_stack';
 my $KEY_USER_VRP_EL = 'user_vrp_el'; # vrp that user is requesting
 my $KEY_USER_VRP_LV = 'user_vrp_lv'; # level page makers working at
 
-# These properties keep track of important user/pref data that should
-# be returned to the browser even if not recognized by subordinates.
-my $KEY_PERSIST_QUERY  = 'persist_query';  # which qp persist for session
-	# this is used only when constructing new urls, and it stores just 
-	# the names of user input params whose values we are to return.
-
 # These properties are used under the assumption that the vrp which 
 # the user provides us is in the query string.
 my $KEY_VRP_UIPN = 'uipn_vrp';  # query param that has vrp as its value
@@ -213,11 +203,8 @@ my $DEF_SITE_TITLE = 'Untitled Website';
 ######################################################################
 
 sub new {
-	my $starter = shift( @_ );  # starter is either object or class
-	my $self = {};
-	bless( $self, ref($starter) || $starter );
-	$self->{$KEY_INITIAL_UI} = ref($starter) ? 
-		$starter->{$KEY_INITIAL_UI} : $self->get_initial_user_input();
+	my $class = shift( @_ );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
 }
@@ -232,19 +219,26 @@ sub initialize {
 	
 	%{$self} = (
 		%{$self},
+		
 		$KEY_IS_DEBUG => undef,
+		
 		$KEY_SITE_ERRORS => [],
+		
 		$KEY_SITE_ROOT_DIR  => undef,
 		$KEY_DELIM_SYS_PATH => undef,
+		
 		$KEY_PREFS => {},
 		$KEY_SRP   => [''],  # needs element zero defined and empty
 		$KEY_VRP   => [''],  # needs element zero defined and empty
 		$KEY_PREFS_STACK => [],
 		$KEY_SRP_STACK   => [],
 		$KEY_VRP_STACK   => [],
+		
 		$KEY_USER_VRP_EL => [],
 		$KEY_USER_VRP_LV => undef,
+		
 		$KEY_VRP_UIPN => $DEF_VRP_UIPN,
+		
 		$KEY_SMTP_HOST => $DEF_SMTP_HOST,
 		$KEY_SMTP_TIMEOUT => $DEF_SMTP_TIMEOUT,
 		$KEY_SITE_TITLE => $DEF_SITE_TITLE,
@@ -256,6 +250,56 @@ sub initialize {
 	$self->site_root_dir( $root );
 	$self->system_path_delimiter( $delim );
 	$self->site_prefs( $prefs );
+}
+
+######################################################################
+
+=head2 clone([ CLONE ])
+
+This method initializes a new object to have all of the same properties of the
+current object and returns it.  This new object can be provided in the optional
+argument CLONE (if CLONE is an object of the same class as the current object);
+otherwise, a brand new object of the current class is used.  Only object 
+properties recognized by CGI::WPM::Globals are set in the clone; other properties 
+are not changed.
+
+=cut
+
+######################################################################
+
+sub clone {
+	my ($self, $clone, @args) = @_;
+	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
+	$clone = $self->CGI::WebUserInput::clone( $clone );
+	$clone = $self->CGI::WebUserOutput::clone( $clone );
+	
+	$clone->{$KEY_IS_DEBUG} = $self->{$KEY_IS_DEBUG};
+
+	$clone->{$KEY_SITE_ERRORS} = [@{$self->{$KEY_SITE_ERRORS}}];
+	
+	$clone->{$KEY_SITE_ROOT_DIR} = $self->{$KEY_SITE_ROOT_DIR};
+	$clone->{$KEY_DELIM_SYS_PATH} = $self->{$KEY_DELIM_SYS_PATH};
+
+	$clone->{$KEY_PREFS} = {%{$self->{$KEY_PREFS}}};
+	$clone->{$KEY_SRP} = [@{$self->{$KEY_SRP}}];
+	$clone->{$KEY_VRP} = [@{$self->{$KEY_VRP}}];
+	$clone->{$KEY_PREFS_STACK} = [@{$self->{$KEY_PREFS_STACK}}];
+	$clone->{$KEY_SRP_STACK} = [@{$self->{$KEY_SRP_STACK}}];
+	$clone->{$KEY_VRP_STACK} = [@{$self->{$KEY_VRP_STACK}}];
+
+	$clone->{$KEY_USER_VRP_EL} = [@{$self->{$KEY_USER_VRP_EL}}];
+	$clone->{$KEY_USER_VRP_LV} = $self->{$KEY_USER_VRP_LV};
+
+	$clone->{$KEY_VRP_UIPN} = $self->{$KEY_VRP_UIPN};
+
+	$clone->{$KEY_SMTP_HOST} = $self->{$KEY_SMTP_HOST};
+	$clone->{$KEY_SMTP_TIMEOUT} = $self->{$KEY_SMTP_TIMEOUT};
+	$clone->{$KEY_SITE_TITLE} = $self->{$KEY_SITE_TITLE};
+	$clone->{$KEY_OWNER_NAME} = $self->{$KEY_OWNER_NAME};
+	$clone->{$KEY_OWNER_EMAIL} = $self->{$KEY_OWNER_EMAIL};
+	$clone->{$KEY_OWNER_EM_VRP} = $self->{$KEY_OWNER_EM_VRP};
+
+	return( $clone );
 }
 
 ######################################################################

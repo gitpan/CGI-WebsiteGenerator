@@ -21,7 +21,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.3';
+$VERSION = '0.31';
 
 ######################################################################
 
@@ -37,13 +37,13 @@ $VERSION = '0.3';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Globals
+	CGI::WPM::Globals 0.3
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Globals;
+use CGI::WPM::Globals 0.3;
 
 ######################################################################
 
@@ -65,11 +65,15 @@ and B<$object-E<gt>method()> for methods.
 
 I<This POD is coming when I get the time to write it.>
 
+	execute( GLOBALS ) - calls new(), then dispatch_by_user(), then finalize()
+	
+	-- or --
+	
 	new( GLOBALS )
 	initialize( GLOBALS )
 	dispatch_by_user()
 	dispatch_by_admin()
-	finalize_page_content()
+	finalize() - replaces the depreciated shim finalize_page_content()
 
 =head1 PREFERENCES HANDLED BY THIS MODULE
 
@@ -94,7 +98,7 @@ I<This POD is coming when I get the time to write it.>
 	_initialize()
 	_dispatch_by_user()
 	_dispatch_by_admin()
-	_finalize_page_content()
+	_finalize()
 
 =head1 PRIVATE METHODS FOR USE BY SUBCLASSES
 
@@ -125,11 +129,22 @@ my $PKEY_PAGE_BODY_ATTR = 'page_body_attr';  # params to put in <BODY>
 my $PKEY_PAGE_REPLACE = 'page_replace';  # replacements to perform
 
 ######################################################################
+# This provides a simpler interface for the most common activity, which has 
+# an ordinary web site visitor viewing a page.  Call it like this:
+# "ClassName->execute( $globals );"
+
+sub execute {
+	my $self = shift( @_ )->new( @_ );
+	$self->dispatch_by_user();
+	$self->finalize();
+	return( $self );
+}
+
+######################################################################
 
 sub new {
 	my $class = shift( @_ );
-	my $self = {};
-	bless( $self, ref($class) || $class );
+	my $self = bless( {}, ref($class) || $class );
 	$self->initialize( @_ );
 	return( $self );
 }
@@ -219,7 +234,7 @@ __endquote
 
 ######################################################################
 
-sub finalize_page_content {   # should be called after "dispatch" methods
+sub finalize {   # should be called after "dispatch" methods
 	my $self = shift( @_ );
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 	my $rh_prefs = $globals->site_prefs();
@@ -251,11 +266,17 @@ sub finalize_page_content {   # should be called after "dispatch" methods
 
 	$globals->add_later_replace( $rh_prefs->{$PKEY_PAGE_REPLACE} );
 
-	$self->_finalize_page_content();
+	$self->_finalize();
 }
 
 # subclass should have their own of these, if needed
-sub _finalize_page_content {
+sub _finalize {
+}
+
+# this is a depreciated shim so that older code won't break right away
+sub finalize_page_content {
+	my $self = shift( @_ );
+	return( $self->finalize( @_ ) );
 }
 
 ######################################################################

@@ -1,3 +1,37 @@
+2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.31.
+
+	* This release is mostly a compatability update to ensure that it works with 
+	the public interface changes in the CGI-FormMaker 0.91 distribution.  The 
+	most significant updates in this regard are to the CGI::WPM::Globals class, 
+	which is now functionally synchrononized with the CGI-FormMaker classes in 
+	respect to the methods new(), initialize(), and clone().
+	
+	* Updated CGI::WPM::Globals to change the way it deals with instances where
+	you want to make several CGI::WPM::Globals objects rather than the usual of 
+	one.  If you want more than one Globals object, you need to use the clone() 
+	method of the first one to make others, as more than one new() could hang 
+	(block on read) your program.  See the ChangeLog in the CGI-FormMaker 
+	distribution for more details, as the relevant behaviour and constraints 
+	come from CGI::WPM::Globals being a subclass of CGI::WebUserInput.  This 
+	class is now at version 0.31 up from 0.3.
+
+	* Updated CGI::WPM::Base to rename the function finalize_page_content() to 
+	finalize() and to add a new function execute().  A depreciated shim method 
+	with the older name of finalize() is provided so that programs which use it 
+	won't break with this distribution upgrade.  For your convenience, the new 
+	method execute( $globals ) has the same effect as calling the 3 methods 
+	[new( $globals ), dispatch_by_user(), finalize()] in that order.  In fact, 
+	using this is recommended considering that subclasses of CGI::WPM::Base are 
+	conceptually applications anyway (but embeddable in other programs).  This 
+	class is now at version 0.31 up from 0.3.
+
+	* Minor updates to CGI::WPM::Multipage and CGI::WPM::Usage whereby they use 
+	the renamed finalize() method of Base when calling subordinate classes.  
+	Also, CGI::WPM::Usage recognizes a few more urls as being search engines.
+	Both classes are now at version 0.3001 up from 0.3.
+
 2000-09-04   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.3.
