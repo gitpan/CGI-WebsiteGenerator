@@ -1,3 +1,30 @@
+2001-04-06   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.35.
+	
+	* CGI::WPM::Globals has been split up into two modules, both of which are at 
+	version 0.35.  The new module is CGI::WPM::FileVirtualPath, which handles 
+	details of managing the virtual paths for file-system files, user input 
+	request path, and path for new urls.  CGI::WPM::Globals still has the same 
+	public interface, though, and is backwards compatible.  The exception to 
+	this is that the publicly documented private methods [site_path_str_to_ra(), 
+	site_path_ra_to_str(), join_two_path_ra(), simplify_path_ra()] have been
+	removed.
+
+	* CGI::WPM::Globals has also lost its send_email_message() method, and 
+	three copies of it were moved into MailForm, GuestBook, and Usage.  
+	Appropriately, those 3 modules now require Net::SMTP and Globals does not.
+
+	* CGI::WPM::SequentialFile has now been dropped from the distribution, and 
+	any functionality that wasn't previously lost to CGI::MultiValuedHash has 
+	been transferred to CGI::WPM::MailForm and CGI::WPM::GuestBook.
+	
+	* Following the above changes, Globals is 5K smaller, GuestBook and MailForm 
+	are each 4K larger, Usage is 2K larger, the new FileVirtualPath module adds 
+	27K (with docs), and the lost SequentialFile drops 24K (with docs).
+	So, while the count of modules is the same at 13, they have a net file size 
+	increase of 8K (+37, -29) including docs.
+
 2001-03-18   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.34.

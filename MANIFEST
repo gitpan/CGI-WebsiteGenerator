@@ -1,6 +1,7 @@
 Base.pm
 ChangeLog
 EventCountFile.pm
+FileVirtualPath.pm
 Globals.pm
 GuestBook.pm
 MailForm.pm
@@ -11,7 +12,6 @@ PageMaker.pm
 ReadMe
 Redirect.pm
 SegTextDoc.pm
-SequentialFile.pm
 Static.pm
 test.pl
 Usage.pm

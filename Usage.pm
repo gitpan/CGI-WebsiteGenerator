@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.34';
+$VERSION = '0.35';
 
 ######################################################################
 
@@ -30,7 +30,7 @@ $VERSION = '0.34';
 
 =head2 Standard Modules
 
-	I<none>
+	Net::SMTP 2.15 (earlier versions may work)
 
 =head2 Nonstandard Modules
 
@@ -335,7 +335,7 @@ sub email_and_reset_counts_if_new_day {
 		my $subject_unique = $rh_mail_pref->{$MKEY_SUBJECT_UNIQUE};
 		defined( $subject_unique) or $subject_unique = ' -- usage to ';
 
-		my $err_msg = $globals->send_email_message(
+		my $err_msg = $self->_send_email_message(
 			$globals->site_owner_name(),
 			$globals->site_owner_email(),
 			$globals->site_owner_name(),
@@ -538,6 +538,94 @@ sub update_one_count_file {
 
 ######################################################################
 
+sub _send_email_message {
+	my ($self, $to_name, $to_email, $from_name, $from_email, 
+		$subject, $body, $body_head_addition) = @_;
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+
+	my $EMAIL_HEADER_STRIP_PATTERN = '[,<>()"\'\n]';  #for names and addys
+	$to_name    =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$to_email   =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$from_name  =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$from_email =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$globals->is_debug() and $subject .= " -- debug";
+	
+	my $body_header = <<__endquote.
+--------------------------------------------------
+This e-mail was sent at @{[$globals->today_date_utc()]} 
+by the web site "@{[$globals->site_title()]}", 
+which is located at "@{[$globals->base_url()]}".
+__endquote
+	$body_head_addition.
+	($globals->is_debug() ? "Debugging is currently turned on.\n" : 
+	'').<<__endquote;
+--------------------------------------------------
+__endquote
+
+	my $body_footer = <<__endquote;
+
+
+--------------------------------------------------
+END OF MESSAGE
+__endquote
+	
+	my $host = $globals->smtp_host();
+	my $timeout = $globals->smtp_timeout();
+	my $error_msg = '';
+
+	TRY: {
+		my $smtp;
+
+		eval { require Net::SMTP; };
+		if( $@ ) {
+			$error_msg = "can't open program module 'Net::SMTP'";
+			last TRY;
+		}
+	
+		unless( $smtp = Net::SMTP->new( $host, Timeout => $timeout ) ) {
+			$error_msg = "can't connect to smtp host: $host";
+			last TRY;
+		}
+
+		unless( $smtp->verify( $from_email ) ) {
+			$error_msg = "invalid address: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->verify( $to_email ) ) {
+			$error_msg = "invalid address: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->mail( "$from_name <$from_email>" ) ) {
+			$error_msg = "from: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->to( "$to_name <$to_email>" ) ) {
+			$error_msg = "to: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		$smtp->data( <<__endquote );
+From: $from_name <$from_email>
+To: $to_name <$to_email>
+Subject: $subject
+Content-Type: text/plain; charset=us-ascii
+
+$body_header
+$body
+$body_footer
+__endquote
+
+		$smtp->quit();
+	}
+	
+	return( $error_msg );
+}
+
+######################################################################
+
 1;
 __END__
 
@@ -558,6 +646,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::EventCountFile.
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::EventCountFile, Net::SMTP.
 
 =cut

@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.34';
+$VERSION = '0.35';
 
 ######################################################################
 
@@ -32,10 +32,11 @@ $VERSION = '0.34';
 
 =head2 Standard Modules
 
-	Net::SMTP 2.15  (used only if we send e-mails; earlier v may work)
+	I<none>
 
 =head2 Nonstandard Modules
 
+	CGI::WPM::FileVirtualPath 0.35
 	CGI::WPM::WebUserIO 0.94
 	CGI::WPM::PageMaker 1.02
 
@@ -43,6 +44,7 @@ $VERSION = '0.34';
 
 ######################################################################
 
+use CGI::WPM::FileVirtualPath 0.35;
 use CGI::WPM::WebUserIO 0.94;
 use CGI::WPM::PageMaker 1.02;
 @ISA = qw( CGI::WPM::WebUserIO CGI::WPM::PageMaker );
@@ -272,18 +274,10 @@ I<This POD is coming when I get the time to write it.>
 	site_owner_email_vrp([ NEW_VALUE ])
 	site_owner_email_html([ VISIBLE_TEXT ])
 
-	send_email_message( TO_NAME, TO_EMAIL, FROM_NAME, FROM_EMAIL,
-		SUBJECT, BODY[, BODY_HEAD_ADD] )
-
 	today_date_utc()
 
 	get_hash_from_file( PHYS_PATH )
 	get_prefs_rh( FILENAME )
-
-	site_path_str_to_ra( PATH_STRING )
-	site_path_ra_to_str( PATH_RA )
-	join_two_path_ra( CURRENT_PATH_RA, CHANGE_VECTOR_RA )
-	simplify_path_ra( PATH_RA )
 
 =cut
 
@@ -302,9 +296,7 @@ my $KEY_SITE_ERRORS = 'site_errors'; # holds error string list, if any
 
 # These properties are set by the code which instantiates this object,
 # are operating system specific, and indicate where all the support 
-# files are for a site.
-my $KEY_SITE_ROOT_DIR = 'site_root_dir';  # root dir of support files
-my $KEY_DELIM_SYS_PATH = 'delim_sys_path';  # level delim in system paths
+# files are for a site. -- now inside $KEY_SRP
 
 # These properties maintain recursive copies of themselves such that 
 # subordinate page making modules can inherit (or override) properties 
@@ -319,8 +311,7 @@ my $KEY_SRP_STACK   = 'srp_stack';
 my $KEY_VRP_STACK   = 'vrp_stack';
 
 # These properties are not recursive, but are unlikely to get edited
-my $KEY_USER_VRP_EL = 'user_vrp_el'; # vrp that user is requesting
-my $KEY_USER_VRP_LV = 'user_vrp_lv'; # level page makers working at
+my $KEY_USER_VRP = 'user_vrp';   # vrp that user is requesting
 
 # These properties are used under the assumption that the vrp which 
 # the user provides us is in the query string.
@@ -336,13 +327,11 @@ my $KEY_OWNER_EM_VRP = 'owner_em_vrp'; # vrp for e-mail page
 
 # Constant values used in this class go here:
 
-my $SITE_PATH_DELIM = '/';  # a "/" for site path = "site root dir"
 my $DEF_VRP_UIPN = 'path';
 
 my $TALB = '[';  # left side of bounds for token replacement arguments
 my $TARB = ']';  # right side of same
 
-my $EMAIL_HEADER_STRIP_PATTERN = '[,<>()"\'\n]';  #for names and addys
 my $DEF_SMTP_HOST = 'localhost';
 my $DEF_SMTP_TIMEOUT = 30;
 my $DEF_SITE_TITLE = 'Untitled Website';
@@ -371,18 +360,14 @@ sub initialize {
 		
 		$KEY_SITE_ERRORS => [],
 		
-		$KEY_SITE_ROOT_DIR  => undef,
-		$KEY_DELIM_SYS_PATH => undef,
-		
 		$KEY_PREFS => {},
-		$KEY_SRP   => [''],  # needs element zero defined and empty
-		$KEY_VRP   => [''],  # needs element zero defined and empty
+		$KEY_SRP   => CGI::WPM::FileVirtualPath->new(),
+		$KEY_VRP   => CGI::WPM::FileVirtualPath->new(),
 		$KEY_PREFS_STACK => [],
 		$KEY_SRP_STACK   => [],
 		$KEY_VRP_STACK   => [],
 		
-		$KEY_USER_VRP_EL => [],
-		$KEY_USER_VRP_LV => undef,
+		$KEY_USER_VRP => CGI::WPM::FileVirtualPath->new(),
 		
 		$KEY_VRP_UIPN => $DEF_VRP_UIPN,
 		
@@ -424,18 +409,14 @@ sub clone {
 
 	$clone->{$KEY_SITE_ERRORS} = [@{$self->{$KEY_SITE_ERRORS}}];
 	
-	$clone->{$KEY_SITE_ROOT_DIR} = $self->{$KEY_SITE_ROOT_DIR};
-	$clone->{$KEY_DELIM_SYS_PATH} = $self->{$KEY_DELIM_SYS_PATH};
-
 	$clone->{$KEY_PREFS} = {%{$self->{$KEY_PREFS}}};
-	$clone->{$KEY_SRP} = [@{$self->{$KEY_SRP}}];
-	$clone->{$KEY_VRP} = [@{$self->{$KEY_VRP}}];
+	$clone->{$KEY_SRP} = $self->{$KEY_SRP}->clone();
+	$clone->{$KEY_VRP} = $self->{$KEY_VRP}->clone();
 	$clone->{$KEY_PREFS_STACK} = [@{$self->{$KEY_PREFS_STACK}}];
-	$clone->{$KEY_SRP_STACK} = [@{$self->{$KEY_SRP_STACK}}];
-	$clone->{$KEY_VRP_STACK} = [@{$self->{$KEY_VRP_STACK}}];
+	$clone->{$KEY_SRP_STACK} = [map { $_->clone() } @{$self->{$KEY_SRP_STACK}}];
+	$clone->{$KEY_VRP_STACK} = [map { $_->clone() } @{$self->{$KEY_VRP_STACK}}];
 
-	$clone->{$KEY_USER_VRP_EL} = [@{$self->{$KEY_USER_VRP_EL}}];
-	$clone->{$KEY_USER_VRP_LV} = $self->{$KEY_USER_VRP_LV};
+	$clone->{$KEY_USER_VRP} = $self->{$KEY_USER_VRP}->clone();
 
 	$clone->{$KEY_VRP_UIPN} = $self->{$KEY_VRP_UIPN};
 
@@ -472,7 +453,7 @@ sub is_debug {
 ######################################################################
 
 sub get_errors {
-	return( grep( defined($_), @{$_[0]->{$KEY_SITE_ERRORS}} ) );
+	return( grep { defined($_) } @{$_[0]->{$KEY_SITE_ERRORS}} );
 }
 
 sub get_error {
@@ -499,27 +480,18 @@ sub add_filesystem_error {
 ######################################################################
 
 sub site_root_dir {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		$self->{$KEY_SITE_ROOT_DIR} = $new_value;
-	}
-	return( $self->{$KEY_SITE_ROOT_DIR} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_SRP}->physical_root( $new_value ) );
 }
 
 sub system_path_delimiter {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		$self->{$KEY_DELIM_SYS_PATH} = $new_value;
-	}
-	return( $self->{$KEY_DELIM_SYS_PATH} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_SRP}->physical_delimiter( $new_value ) );
 }
 
 sub phys_filename_string {
-	my ($self, $filename) = @_;
-	my $root_dir = $self->{$KEY_SITE_ROOT_DIR};
-	my $sys_delim = $self->{$KEY_DELIM_SYS_PATH};
-	my @sp_parts = @{$self->srp_child( $filename )};
-	return( $root_dir.join( $sys_delim, @sp_parts ) );
+	my ($self, $chg_vec, $trailer) = @_;
+	return( $self->{$KEY_SRP}->physical_child_path_string( $chg_vec, $trailer ) );
 }
 
 ######################################################################
@@ -566,137 +538,103 @@ sub site_pref {
 ######################################################################
 
 sub site_resource_path {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		my @elements = ('', ref( $new_value ) eq 'ARRAY' ?
-			@{$new_value} : @{$self->site_path_str_to_ra( $new_value )});
-		$self->{$KEY_SRP} = $self->simplify_path_ra( \@elements );
-	}
-	return( $self->{$KEY_SRP} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_SRP}->path( $new_value ) );
 }
 
 sub site_resource_path_string {
-	my $self = shift( @_ );
-	my $trailer = shift( @_ ) ? $SITE_PATH_DELIM : '';
-	return( $self->site_path_ra_to_str( $self->{$KEY_SRP} ).$trailer );
+	my ($self, $trailer) = @_;
+	return( $self->{$KEY_SRP}->path_string( $trailer ) );
 }
 	
 sub move_current_srp {
 	my ($self, $chg_vec) = @_;
 	push( @{$self->{$KEY_SRP_STACK}}, $self->{$KEY_SRP} );
-	my $ra_elements = $self->join_two_path_ra( $self->{$KEY_SRP}, 
-		ref($chg_vec) eq 'ARRAY' ? $chg_vec :
-		$self->site_path_str_to_ra( $chg_vec ) );
-	$self->{$KEY_SRP} = $self->simplify_path_ra( $ra_elements );
+	$self->{$KEY_SRP} = $self->{$KEY_SRP}->child_path_obj( $chg_vec );
 }
 
 sub restore_last_srp {
-	my $self = shift( @_ );
-	$self->{$KEY_SRP} = pop( @{$self->{$KEY_SRP_STACK}} ) || [];
+	my ($self) = @_;
+	if( @{$self->{$KEY_SRP_STACK}} ) {
+		$self->{$KEY_SRP} = pop( @{$self->{$KEY_SRP_STACK}} );
+	}
 }
 
 sub srp_child {
-	my ($self, $filename) = @_;
-	my $ra_elements = $self->join_two_path_ra( $self->{$KEY_SRP}, 
-		ref($filename) eq 'ARRAY' ? $filename :
-		$self->site_path_str_to_ra( $filename ) );
-	return( $self->simplify_path_ra( $ra_elements ) );
+	my ($self, $chg_vec) = @_;
+	return( $self->{$KEY_SRP}->child_path( $chg_vec ) );
 }
 
 sub srp_child_string {
-	my ($self, $fn, $sx) = @_;
-	$sx and $sx = $SITE_PATH_DELIM;
-	return( $self->site_path_ra_to_str( $self->srp_child( $fn ) ).$sx );
+	my ($self, $chg_vec, $trailer) = @_;
+	return( $self->{$KEY_SRP}->child_path_string( $chg_vec, $trailer ) );
 }
 
 ######################################################################
 
 sub virtual_resource_path {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		my @elements = ('', ref( $new_value ) eq 'ARRAY' ?
-			@{$new_value} : @{$self->site_path_str_to_ra( $new_value )});
-		$self->{$KEY_VRP} = $self->simplify_path_ra( \@elements );
-	}
-	return( $self->{$KEY_VRP} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_VRP}->path( $new_value ) );
 }
 
 sub virtual_resource_path_string {
-	my $self = shift( @_ );
-	my $trailer = shift( @_ ) ? $SITE_PATH_DELIM : '';
-	return( $self->site_path_ra_to_str( $self->{$KEY_VRP} ).$trailer );
+	my ($self, $trailer) = @_;
+	return( $self->{$KEY_VRP}->path_string( $trailer ) );
 }
 	
 sub move_current_vrp {
 	my ($self, $chg_vec) = @_;
 	push( @{$self->{$KEY_VRP_STACK}}, $self->{$KEY_VRP} );
-	my $ra_elements = $self->join_two_path_ra( $self->{$KEY_VRP}, 
-		ref($chg_vec) eq 'ARRAY' ? $chg_vec :
-		$self->site_path_str_to_ra( $chg_vec ) );
-	$self->{$KEY_VRP} = $self->simplify_path_ra( $ra_elements );
+	$self->{$KEY_VRP} = $self->{$KEY_VRP}->child_path_obj( $chg_vec );
 }
 
 sub restore_last_vrp {
-	my $self = shift( @_ );
-	$self->{$KEY_VRP} = pop( @{$self->{$KEY_VRP_STACK}} ) || [];
+	my ($self) = @_;
+	if( @{$self->{$KEY_VRP_STACK}} ) {
+		$self->{$KEY_VRP} = pop( @{$self->{$KEY_VRP_STACK}} );
+	}
 }
 
 sub vrp_child {
-	my ($self, $filename) = @_;
-	my $ra_elements = $self->join_two_path_ra( $self->{$KEY_VRP}, 
-		ref($filename) eq 'ARRAY' ? $filename :
-		$self->site_path_str_to_ra( $filename ) );
-	return( $self->simplify_path_ra( $ra_elements ) );
+	my ($self, $chg_vec) = @_;
+	return( $self->{$KEY_VRP}->child_path( $chg_vec ) );
 }
 
 sub vrp_child_string {
-	my ($self, $fn, $sx) = @_;
-	$sx and $sx = $SITE_PATH_DELIM;
-	return( $self->site_path_ra_to_str( $self->vrp_child( $fn ) ).$sx );
+	my ($self, $chg_vec, $trailer) = @_;
+	return( $self->{$KEY_VRP}->child_path_string( $chg_vec, $trailer ) );
 }
 
 ######################################################################
 
 sub user_vrp {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		my @elements = ('', ref( $new_value ) eq 'ARRAY' ?
-			@{$new_value} : @{$self->site_path_str_to_ra( $new_value )});
-		$self->{$KEY_USER_VRP_EL} = $self->simplify_path_ra( \@elements );
-	}
-	return( $self->{$KEY_USER_VRP_EL} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_USER_VRP}->path( $new_value ) );
 }
 
 sub user_vrp_string {
-	my $self = shift( @_ );
-	return( $self->site_path_ra_to_str( $self->{$KEY_USER_VRP_EL} ) );
+	my ($self, $trailer) = @_;
+	return( $self->{$KEY_USER_VRP}->path_string( $trailer ) );
 }
 
 sub current_user_vrp_level {
-	my $self = shift( @_ );
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		$self->{$KEY_USER_VRP_LV} = 0 + $new_value;
-	}
-	return( $self->{$KEY_USER_VRP_LV} );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_USER_VRP}->current_path_level( $new_value ) );
 }
 
 sub inc_user_vrp_level {
-	my $self = shift( @_ );
-	return( ++$self->{$KEY_USER_VRP_LV} );
+	my ($self) = @_;
+	return( $self->{$KEY_USER_VRP}->inc_path_level() );
 }
 
 sub dec_user_vrp_level {
-	my $self = shift( @_ );
-	return( --$self->{$KEY_USER_VRP_LV} );
+	my ($self) = @_;
+	return( $self->{$KEY_USER_VRP}->dec_path_level() );
 }
 
 sub current_user_vrp_element {
-	my $self = shift( @_ );
-	my $curr_elem_num = $self->{$KEY_USER_VRP_LV};
-	if( defined( my $new_value = shift( @_ ) ) ) {
-		$self->{$KEY_USER_VRP_EL}->[$curr_elem_num] = $new_value;
-	}
-	return( $self->{$KEY_USER_VRP_EL}->[$curr_elem_num] );
+	my ($self, $new_value) = @_;
+	return( $self->{$KEY_USER_VRP}->current_path_element( $new_value ) );
 }
 
 ######################################################################
@@ -786,92 +724,6 @@ sub site_owner_email_html {
 
 ######################################################################
 
-sub send_email_message {
-	my ($self, $to_name, $to_email, $from_name, $from_email, 
-		$subject, $body, $body_head_addition) = @_;
-
-	$to_name    =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
-	$to_email   =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
-	$from_name  =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
-	$from_email =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
-	$self->is_debug() and $subject .= " -- debug";
-	
-	my $body_header = <<__endquote.
---------------------------------------------------
-This e-mail was sent at @{[$self->today_date_utc()]} 
-by the web site "@{[$self->site_title()]}", 
-which is located at "@{[$self->base_url()]}".
-__endquote
-	$body_head_addition.
-	($self->is_debug() ? "Debugging is currently turned on.\n" : 
-	'').<<__endquote;
---------------------------------------------------
-__endquote
-
-	my $body_footer = <<__endquote;
-
-
---------------------------------------------------
-END OF MESSAGE
-__endquote
-	
-	my $host = $self->smtp_host();
-	my $timeout = $self->smtp_timeout();
-	my $error_msg = '';
-
-	TRY: {
-		my $smtp;
-
-		eval { require Net::SMTP; };
-		if( $@ ) {
-			$error_msg = "can't open program module 'Net::SMTP'";
-			last TRY;
-		}
-	
-		unless( $smtp = Net::SMTP->new( $host, Timeout => $timeout ) ) {
-			$error_msg = "can't connect to smtp host: $host";
-			last TRY;
-		}
-
-		unless( $smtp->verify( $from_email ) ) {
-			$error_msg = "invalid address: @{[$smtp->message()]}";
-			last TRY;
-		}
-
-		unless( $smtp->verify( $to_email ) ) {
-			$error_msg = "invalid address: @{[$smtp->message()]}";
-			last TRY;
-		}
-
-		unless( $smtp->mail( "$from_name <$from_email>" ) ) {
-			$error_msg = "from: @{[$smtp->message()]}";
-			last TRY;
-		}
-
-		unless( $smtp->to( "$to_name <$to_email>" ) ) {
-			$error_msg = "to: @{[$smtp->message()]}";
-			last TRY;
-		}
-
-		$smtp->data( <<__endquote );
-From: $from_name <$from_email>
-To: $to_name <$to_email>
-Subject: $subject
-Content-Type: text/plain; charset=us-ascii
-
-$body_header
-$body
-$body_footer
-__endquote
-
-		$smtp->quit();
-	}
-	
-	return( $error_msg );
-}
-
-######################################################################
-
 sub today_date_utc {
 	my ($sec, $min, $hour, $mday, $mon, $year) = gmtime(time);
 	$year += 1900;  # year counts from 1900 AD otherwise
@@ -910,38 +762,6 @@ __endquote
 
 	}
 	return( $site_prefs );
-}
-
-######################################################################
-
-sub site_path_str_to_ra {
-	return( [split( $SITE_PATH_DELIM, $_[1] )] );
-}
-
-sub site_path_ra_to_str {
-	return( join( $SITE_PATH_DELIM, @{$_[1]} ) );
-}
-
-sub join_two_path_ra {
-	my ($self, $curr, $chg) = @_;
-	return( @{$chg} && $chg->[0] eq '' ? [@{$chg}] : [@{$curr}, @{$chg}] );
-}
-
-sub simplify_path_ra {
-	my $self = shift( @_ );
-	my @in = @{shift( @_ )};
-	my @mid = ();
-	my @out = $in[0] eq '' ? shift( @in ) : ();
-	
-	foreach my $part (@in) {
-		$part =~ /[a-zA-Z0-9]/ and push( @mid, $part ) and next;
-		$part ne '..' and next;
-		@mid ? pop( @mid ) : push( @out, '..' );
-	}
-
-	$out[0] eq '' and @out = '';
-	push( @out, @mid );
-	return( \@out );
 }
 
 ######################################################################

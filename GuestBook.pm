@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.34';
+$VERSION = '0.35';
 
 ######################################################################
 
@@ -31,24 +31,28 @@ $VERSION = '0.34';
 
 =head2 Standard Modules
 
-	I<none>
+	Fcntl
+	Symbol
+	Net::SMTP 2.15 (earlier versions may work)
 
 =head2 Nonstandard Modules
 
+	CGI::WPM::Globals 0.35
 	CGI::WPM::Base 0.34
-	CGI::WPM::Globals 0.34
-	HTML::FormTemplate 1.05
 	CGI::MultiValuedHash 1.06
-	CGI::WPM::SequentialFile 1.04
+	HTML::FormTemplate 1.05
 
 =cut
 
 ######################################################################
 
+use Fcntl qw(:DEFAULT :flock);
+use Symbol;
+use CGI::WPM::Globals 0.35;
 use CGI::WPM::Base 0.34;
 @ISA = qw(CGI::WPM::Base);
-use HTML::FormTemplate 1.05;  # uses CMVH 1.06
-use CGI::WPM::SequentialFile 1.04;  # uses CMVH 1.06
+use CGI::MultiValuedHash 1.06;
+use HTML::FormTemplate 1.05;
 
 ######################################################################
 
@@ -365,10 +369,8 @@ sub get_question_field_defs {
 	}
 	
 	# we will now get questions using CGI::WPM::SequentialFile
-	my $field_defin_file = CGI::WPM::SequentialFile->new( $filepath );
-	my $ra_field_list = $field_defin_file->fetch_all_records( 1 );
+	my $ra_field_list = $self->_fetch_all_records( $filepath );
 	ref( $ra_field_list ) eq 'ARRAY' or $ra_field_list = [];
-	$globals->add_error( $field_defin_file->is_error() );
 	return( $ra_field_list );
 }
 
@@ -404,12 +406,9 @@ sub read_guest_book {
 
 	my $filename = $globals->site_pref( $PKEY_FN_MESSAGES );
 	my $filepath = $globals->phys_filename_string( $filename );
-	my $message_file = CGI::WPM::SequentialFile->new( $filepath, 1 );
-	my @message_list = $message_file->fetch_all_records( 1 );
+	my @message_list = $self->_fetch_all_records( $filepath );
 
-	if( my $err_msg = $message_file->is_error() ) {
-		$globals->add_error( $err_msg );
-	
+	if( my $err_msg = $globals->get_error() ) {
 		$globals->title( "Error Reading GuestBook Postings" );
 
 		$globals->body_content( <<__endquote );
@@ -540,7 +539,7 @@ sub send_mail_to_me {
 	my ($self, $form) = @_;
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
-	my $err_msg = $globals->send_email_message(
+	my $err_msg = $self->_send_email_message(
 		$globals->site_owner_name(),
 		$globals->site_owner_email(),
 		$globals->user_input_param( $FFN_NAMEREAL ),
@@ -605,10 +604,9 @@ sub sign_guest_book {
 
 	my $filename = $globals->site_pref( $PKEY_FN_MESSAGES );
 	my $filepath = $globals->phys_filename_string( $filename );
-	my $message_file = CGI::WPM::SequentialFile->new( $filepath, 1 );
-	$message_file->append_new_records( $new_posting );
+	$self->_append_new_records( $filepath, $new_posting );
 
-	if( my $err_msg = $message_file->is_error() ) {
+	if( my $err_msg = $globals->get_error() ) {
 		$globals->add_error( $err_msg );
 	
 		$globals->title( "Error Writing to Guest Book" );
@@ -671,7 +669,7 @@ sub send_mail_to_writer {
 	my ($self, $form) = @_;
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
-	my $err_msg = $globals->send_email_message(
+	my $err_msg = $self->_send_email_message(
 		$globals->user_input_param( $FFN_NAMEREAL ),
 		$globals->user_input_param( $FFN_EMAIL ),
 		$globals->site_owner_name(),
@@ -703,6 +701,192 @@ __endquote
 
 ######################################################################
 
+sub _fetch_all_records {
+	my $self = shift( @_ );
+	my $file_path = shift( @_ );
+	
+	my $fh = gensym;
+	
+	$self->_open_and_lock( $fh, $file_path, 0 ) or return( undef );
+
+	seek( $fh, 0, 0 ) or do {
+		$self->_make_filesystem_error( "seek start of", $file_path );
+		return( undef );
+	};
+
+	my $ra_record_list = CGI::MultiValuedHash->batch_from_file( $fh, 1 ) or do {
+		$self->_make_filesystem_error( "read record from", $file_path );
+		return( undef );
+	};
+
+	$self->_unlock_and_close( $fh, $file_path ) or return( undef );
+
+	return( wantarray ? @{$ra_record_list} : $ra_record_list );
+}
+
+######################################################################
+
+sub _append_new_records {
+	my $self = shift( @_ );
+	my $file_path = shift( @_ );
+	my $ra_record_list = (ref( $_[0] ) eq 'ARRAY') ? $_[0] : [@_];
+	
+	my $fh = gensym;
+	
+	$self->_open_and_lock( $fh, $file_path, 1 ) or return( undef );
+
+	seek( $fh, 0, 2 ) or do {
+		$self->_make_filesystem_error( "seek end of", $file_path );
+		return( undef );
+	};
+
+	CGI::MultiValuedHash->batch_to_file( $fh, $ra_record_list ) or do {
+		$self->_make_filesystem_error( "write record to", $file_path );
+		return( undef );
+	};
+
+	$self->_unlock_and_close( $fh, $file_path ) or return( undef );
+
+	return( 1 );
+}
+
+######################################################################
+
+sub _open_and_lock {
+	my ($self, $fh, $file_path, $read_and_write) = @_;
+	
+	my $flags = $read_and_write ? O_RDWR|O_CREAT : O_RDONLY|O_CREAT;
+	my $perms = 0666;
+
+	sysopen( $fh, $file_path, $flags, $perms ) or do {
+		$self->_make_filesystem_error( "open", $file_path );
+		return( undef );
+	};
+
+	flock( $fh, $read_and_write ? LOCK_EX : LOCK_SH ) or do {
+		$self->_make_filesystem_error( "lock", $file_path );
+		return( undef );
+	};
+
+	return( 1 );
+}
+
+######################################################################
+
+sub _unlock_and_close {
+	my ($self, $fh, $file_path) = @_;
+	
+	flock( $fh, LOCK_UN ) or do {
+		$self->_make_filesystem_error( "unlock", $file_path );
+		return( undef );
+	};
+
+	close( $fh ) or do {
+		$self->_make_filesystem_error( "close", $file_path );
+		return( undef );
+	};
+
+	return( 1 );
+}
+
+######################################################################
+
+sub _make_filesystem_error {
+	my ($self, $unique_part, $file_path) = @_;
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+	$globals->add_error( "can't $unique_part data file '$file_path': $!" );
+}
+
+######################################################################
+
+sub _send_email_message {
+	my ($self, $to_name, $to_email, $from_name, $from_email, 
+		$subject, $body, $body_head_addition) = @_;
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+
+	my $EMAIL_HEADER_STRIP_PATTERN = '[,<>()"\'\n]';  #for names and addys
+	$to_name    =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$to_email   =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$from_name  =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$from_email =~ s/$EMAIL_HEADER_STRIP_PATTERN//g;
+	$globals->is_debug() and $subject .= " -- debug";
+	
+	my $body_header = <<__endquote.
+--------------------------------------------------
+This e-mail was sent at @{[$globals->today_date_utc()]} 
+by the web site "@{[$globals->site_title()]}", 
+which is located at "@{[$globals->base_url()]}".
+__endquote
+	$body_head_addition.
+	($globals->is_debug() ? "Debugging is currently turned on.\n" : 
+	'').<<__endquote;
+--------------------------------------------------
+__endquote
+
+	my $body_footer = <<__endquote;
+
+
+--------------------------------------------------
+END OF MESSAGE
+__endquote
+	
+	my $host = $globals->smtp_host();
+	my $timeout = $globals->smtp_timeout();
+	my $error_msg = '';
+
+	TRY: {
+		my $smtp;
+
+		eval { require Net::SMTP; };
+		if( $@ ) {
+			$error_msg = "can't open program module 'Net::SMTP'";
+			last TRY;
+		}
+	
+		unless( $smtp = Net::SMTP->new( $host, Timeout => $timeout ) ) {
+			$error_msg = "can't connect to smtp host: $host";
+			last TRY;
+		}
+
+		unless( $smtp->verify( $from_email ) ) {
+			$error_msg = "invalid address: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->verify( $to_email ) ) {
+			$error_msg = "invalid address: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->mail( "$from_name <$from_email>" ) ) {
+			$error_msg = "from: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		unless( $smtp->to( "$to_name <$to_email>" ) ) {
+			$error_msg = "to: @{[$smtp->message()]}";
+			last TRY;
+		}
+
+		$smtp->data( <<__endquote );
+From: $from_name <$from_email>
+To: $to_name <$to_email>
+Subject: $subject
+Content-Type: text/plain; charset=us-ascii
+
+$body_header
+$body
+$body_footer
+__endquote
+
+		$smtp->quit();
+	}
+	
+	return( $error_msg );
+}
+
+######################################################################
+
 1;
 __END__
 
@@ -724,6 +908,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 =head1 SEE ALSO
 
 perl(1), CGI::WPM::Base, CGI::WPM::Globals, HTML::FormTemplate, 
-CGI::MultiValuedHash, CGI::WPM::SequentialFile.
+CGI::MultiValuedHash, Net::SMTP, Fcntl, Symbol.
 
 =cut

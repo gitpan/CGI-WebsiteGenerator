@@ -87,9 +87,9 @@ and is a very solid release, so I see no reason to support anything older.
 
 Modules in this distribution require modules in these following distributions:
 
-HTML-EasyTags-1.0301.tar.gz
+HTML-EasyTags-1.03.tar.gz
 	- by Darren Duncan (DUNCAND)
-	- HTML::EasyTags 1.0301 is required by:
+	- HTML::EasyTags 1.03 is required by:
 		- CGI::WPM::PageMaker (when assembling a final HTML page only)
 		- Anything that uses PageMaker except when redirection headers and usage
 
@@ -97,8 +97,9 @@ MultiValuedHash-1.06.tar.gz
 	- by Darren Duncan (DUNCAND)
 	- CGI::MultiValuedHash 1.06 is required by:
 		- CGI::WPM::WebUserIO (parsing user input)
-		- CGI::WPM::SequentialFile (for serializing file data)
-		- CGI::WPM::Globals (inherits WebUserIO)
+		- CGI::WPM::MailForm (for serializing file data)
+		- CGI::WPM::GuestBook (for serializing file data)
+		- Anything that uses Globals
 		- Anything that uses FormTemplate
 
 HTML-FormTemplate-1.05.tar.gz
@@ -110,8 +111,9 @@ HTML-FormTemplate-1.05.tar.gz
 libnet-1.0703.tar.gz (older versions may work):
 	- by Graham Barr (GBARR)
 	- Net::SMTP 2.15 is required by:
-		- CGI::WPM::Globals (when sending e-mails of form or usage data)
-		- Anything that uses Globals
+		- CGI::WPM::MailForm (when sending e-mails of form data)
+		- CGI::WPM::GuestBook (when sending e-mails of form data)
+		- CGI::WPM::Usage (when sending e-mails of usage data)
 
 libwww-perl-5.48.tar.gz (older versions may work):
 	- by Gisle Aas (GAAS)
@@ -164,6 +166,8 @@ MODULE LIST
 Here is a quick list of all the modules in the distribution, and what each is
 for.
 
+CGI::WPM::FileVirtualPath - Portable abstraction of a file/dir/url path.
+
 CGI::WPM::PageMaker - Perl module that maintains and assembles the components of a 
 new HTML 4 page, with CSS, and also provides search and replace capabilities.
 
@@ -171,9 +175,6 @@ CGI::WPM::WebUserIO - Perl module that gathers, parses, and manages user input a
 output data, including HTTP headers, query strings, posts, searches, cookies, and
 shell arguments, as well as providing cleaner access to many environment
 variables, consistantly under both CGI and mod_perl.
-
-CGI::WPM::SequentialFile - Perl module that interfaces to a common text file format
-which stores records as named and url-escaped key=value pairs.
 
 CGI::WPM::EventCountFile - Perl module that interfaces to a tab-delimited text file
 for storing date-bounded counts of occurances for multiple events, such as web
@@ -341,6 +342,11 @@ PROGRAM EXAMPLE
 Note that this example only uses some of the lower level modules, and also uses 
 the HTML-FormTemplate distribution.  See the POD for CGI::WPM::Globals and 
 CGI::WPM::Base for examples of the use of my high level modules.
+
+WARNING: as of release 0.35, the SequentialFile module ceased to exist, so the 
+following is for historical purposes only.  All of the core functionality was 
+transferred to CGI::MultiValuedHash, so you should look there.  Anything else 
+that was needed by MailForm or GuestBook has been absorbed into them.
 
 	use HTML::FormTemplate;
 	use CGI::WPM::PageMaker;
