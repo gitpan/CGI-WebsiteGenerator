@@ -17,7 +17,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.35';
+$VERSION = '0.36';
 
 ######################################################################
 
@@ -223,7 +223,7 @@ physical path that is outside the virtual root.
 
 =head1 FUNCTIONS AND METHODS
 
-=head2 new([ SOURCE ])
+=head2 new([ PHY_ROOT[, PHY_DELIM[, VIR_DELIM[, VIR_PATH]]] ])
 
 This function creates a new CGI::WPM::FileVirtualPath (or subclass) object and
 returns it.  All of the method arguments are passed to initialize() as is; please
@@ -242,10 +242,13 @@ sub new {
 
 ######################################################################
 
-=head2 initialize([ SOURCE ])
+=head2 initialize([ PHY_ROOT[, PHY_DELIM[, VIR_DELIM[, VIR_PATH]]] ])
 
 This method is used by B<new()> to set the initial properties of objects that it
-creates.  
+creates.  The 4 optional arguments allow you to set the default values for the 
+four object properties that the following methods also handle: physical_root(), 
+physical_delimiter(), path_delimiter, path().  Semantecs are the same as calling 
+those 4 methods yourself in the same order. 
 
 =cut
 

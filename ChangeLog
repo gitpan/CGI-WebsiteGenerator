@@ -1,3 +1,27 @@
+2001-04-10   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.36.
+	
+	* The superclasses of CGI::WPM::Globals have been merged with it, and so 
+	the PageMaker and WebUserIO modules no longer exist as separate files.  
+	The merge was very clean and you can use Globals exactly has you had before.
+	You can also use Globals as if it were PageMaker or WebUserIO, with the 
+	exception that their various new() and initialize() methods took different 
+	arguments; you now call the way Globals was called.
+	
+	* The method today_date_utc() was removed from Globals and three copies of it 
+	were moved into MailForm, GuestBook, and Usage.
+	
+	* The module CGI::WPM::EventCountFile has been renamed to 
+	CGI::WPM::CountFile, and the new version number is 0.36.  No other changes 
+	of significance were made to it.  CGI::WPM::Usage was updated to look for 
+	this module under its new name also.
+
+	* Some small POD improvements were made to FileVirtualPath.
+
+	* In this release, all of the modules have versions no higher than 0.36, 
+	which more accurately reflects their "not done yet" status.
+
 2001-04-06   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.35.

@@ -20,7 +20,7 @@ CONTENTS
 
 PREFACE
 
-This distribution features 13 Perl 5 modules that all belong in the temporary 
+This distribution features 11 Perl 5 modules that all belong in the temporary 
 CGI::WPM::* namespace.  These modules are not officially registered, as they are 
 in a state of change.  As such they are subject to be renamed, some could be 
 split up and others combined.  However, they are perfectly usable as is.
@@ -90,13 +90,13 @@ Modules in this distribution require modules in these following distributions:
 HTML-EasyTags-1.03.tar.gz
 	- by Darren Duncan (DUNCAND)
 	- HTML::EasyTags 1.03 is required by:
-		- CGI::WPM::PageMaker (when assembling a final HTML page only)
-		- Anything that uses PageMaker except when redirection headers and usage
+		- CGI::WPM::Globals (when assembling a final HTML page only)
+		- Anything that uses Globals except when redirection headers and usage
 
 MultiValuedHash-1.06.tar.gz
 	- by Darren Duncan (DUNCAND)
 	- CGI::MultiValuedHash 1.06 is required by:
-		- CGI::WPM::WebUserIO (parsing user input)
+		- CGI::WPM::Globals (parsing user input)
 		- CGI::WPM::MailForm (for serializing file data)
 		- CGI::WPM::GuestBook (for serializing file data)
 		- Anything that uses Globals
@@ -118,11 +118,11 @@ libnet-1.0703.tar.gz (older versions may work):
 libwww-perl-5.48.tar.gz (older versions may work):
 	- by Gisle Aas (GAAS)
 	- HTTP::Headers 1.37 is required by:
-		- CGI::WPM::WebUserIO (when outputting http headers to the user)
+		- CGI::WPM::Globals (when outputting http headers to the user)
 
 mod_perl-1.24_01.tar.gz (older versions may work):
 	- Apache 1.27 is required by:
-		- CGI::WPM::WebUserIO (when running under mod_perl)
+		- CGI::WPM::Globals (when running under mod_perl)
 
 INSTALLATION
 
@@ -168,22 +168,14 @@ for.
 
 CGI::WPM::FileVirtualPath - Portable abstraction of a file/dir/url path.
 
-CGI::WPM::PageMaker - Perl module that maintains and assembles the components of a 
-new HTML 4 page, with CSS, and also provides search and replace capabilities.
-
-CGI::WPM::WebUserIO - Perl module that gathers, parses, and manages user input and
-output data, including HTTP headers, query strings, posts, searches, cookies, and
-shell arguments, as well as providing cleaner access to many environment
-variables, consistantly under both CGI and mod_perl.
-
-CGI::WPM::EventCountFile - Perl module that interfaces to a tab-delimited text file
+CGI::WPM::CountFile - Perl module that interfaces to a tab-delimited text file
 for storing date-bounded counts of occurances for multiple events, such as web
 page views.
 
 CGI::WPM::Globals - Perl module that is used by all subclasses of CGI::WPM::Base
 for managing global program settings, file system and web site hierarchy
 contexts, providing environment details, gathering and managing user input,
-collecting and sending user output, and providing utilities like sending e-mail.
+collecting and sending user output.
 
 CGI::WPM::Base - Perl module that defines the API for subclasses, which are
 miniature applications called "web page makers", and provides them with a
@@ -346,7 +338,9 @@ CGI::WPM::Base for examples of the use of my high level modules.
 WARNING: as of release 0.35, the SequentialFile module ceased to exist, so the 
 following is for historical purposes only.  All of the core functionality was 
 transferred to CGI::MultiValuedHash, so you should look there.  Anything else 
-that was needed by MailForm or GuestBook has been absorbed into them.
+that was needed by MailForm or GuestBook has been absorbed into them.  
+As of release 0.36, the PageMaker and WebUserIO modules also ceased to exist.  
+These are absorbed into Globals so you can use it like you used both of them.
 
 	use HTML::FormTemplate;
 	use CGI::WPM::PageMaker;

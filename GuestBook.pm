@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.35';
+$VERSION = '0.36';
 
 ######################################################################
 
@@ -598,7 +598,7 @@ sub sign_guest_book {
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
 	my $new_posting = $globals->user_input()->clone();
-	$new_posting->store( $LFN_SUBMIT_DATE, $globals->today_date_utc() );
+	$new_posting->store( $LFN_SUBMIT_DATE, $self->_today_date_utc() );
 	$new_posting->store( $LFN_SUBMIT_DOMAIN, 
 		$globals->remote_addr().':'.$globals->remote_host() );
 
@@ -813,7 +813,7 @@ sub _send_email_message {
 	
 	my $body_header = <<__endquote.
 --------------------------------------------------
-This e-mail was sent at @{[$globals->today_date_utc()]} 
+This e-mail was sent at @{[$self->_today_date_utc()]} 
 by the web site "@{[$globals->site_title()]}", 
 which is located at "@{[$globals->base_url()]}".
 __endquote
@@ -883,6 +883,16 @@ __endquote
 	}
 	
 	return( $error_msg );
+}
+
+######################################################################
+
+sub _today_date_utc {
+	my ($sec, $min, $hour, $mday, $mon, $year) = gmtime(time);
+	$year += 1900;  # year counts from 1900 AD otherwise
+	$mon += 1;      # ensure January is 1, not 0
+	my @parts = ($year, $mon, $mday, $hour, $min, $sec);
+	return( sprintf( "%4.4d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d UTC", @parts ) );
 }
 
 ######################################################################

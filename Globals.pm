@@ -3,7 +3,7 @@
 CGI::WPM::Globals - Perl module that is used by all subclasses of CGI::WPM::Base
 for managing global program settings, file system and web site hierarchy
 contexts, providing environment details, gathering and managing user input,
-collecting and sending user output, and providing utilities like sending e-mail.
+collecting and sending user output.
 
 =cut
 
@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.35';
+$VERSION = '0.36';
 
 ######################################################################
 
@@ -32,22 +32,21 @@ $VERSION = '0.35';
 
 =head2 Standard Modules
 
-	I<none>
+	Apache (when running under mod_perl only)
+	HTTP::Headers 1.36 (earlier versions may work, but not tested)
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::FileVirtualPath 0.35
-	CGI::WPM::WebUserIO 0.94
-	CGI::WPM::PageMaker 1.02
+	CGI::MultiValuedHash 1.06
+	CGI::WPM::FileVirtualPath 0.36
+	HTML::EasyTags 1.03  # required in content_as_string() method only
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::FileVirtualPath 0.35;
-use CGI::WPM::WebUserIO 0.94;
-use CGI::WPM::PageMaker 1.02;
-@ISA = qw( CGI::WPM::WebUserIO CGI::WPM::PageMaker );
+use CGI::MultiValuedHash 1.06;
+use CGI::WPM::FileVirtualPath 0.36;
 
 ######################################################################
 
@@ -195,14 +194,6 @@ use CGI::WPM::PageMaker 1.02;
 
 I<This POD is coming when I get the time to write it.>
 
-Subdirectories are all relative, so having '' means the current directory, 
-'something' is a level down, '..' is a level up, '../another' is a level 
-sideways, 'one/more/time' is 3 levels down.  However, any relative subdir 
-beginning with '/' becomes absolute, where '/' corresponds to the site file 
-root.  You can not go to parents of the site root.  Those are physical 
-directories (site resource path), and the uri does not reflect them.  The uri 
-does, however, reflect uri changes (virtual resource path).  
-
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
@@ -210,12 +201,7 @@ using object notation.  This means using B<Class-E<gt>function()> for functions
 and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
 your own modules, then that often means something like B<$self-E<gt>method()>. 
 
-=head1 FUNCTIONS AND METHODS
-
-This module inherits the full public interfaces and functionality of both 
-CGI::WebUserInput and CGI::WebUserOutput, so the POD in those modules is also 
-applicable to this one.  However, the new() and initialize() and clone() methods 
-of those modules are overridden by ones defined in this one.
+=head1 UNDOCUMENTED FUNCTIONS AND METHODS
 
 I<This POD is coming when I get the time to write it.>
 
@@ -223,8 +209,6 @@ I<This POD is coming when I get the time to write it.>
 	initialize([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
 	clone([ CLONE ]) -- POD for this available below
 	
-	send_content_to_user([ CONTENT ]) -- overrides CGI::WPM::WebUserIO's version
-
 	is_debug([ NEW_VALUE ])
 
 	get_errors()
@@ -274,10 +258,63 @@ I<This POD is coming when I get the time to write it.>
 	site_owner_email_vrp([ NEW_VALUE ])
 	site_owner_email_html([ VISIBLE_TEXT ])
 
-	today_date_utc()
-
 	get_hash_from_file( PHYS_PATH )
 	get_prefs_rh( FILENAME )
+
+	is_mod_perl()
+
+	user_cookie_str()
+	user_query_str()
+	user_post_str()
+	user_offline_str()
+	is_oversize_post()
+
+	request_method()
+	content_length()
+
+	server_name()
+	virtual_host()
+	server_port()
+	script_name()
+
+	http_referer()
+
+	remote_addr()
+	remote_host()
+	remote_user()
+	user_agent()
+
+	base_url()
+	self_url()
+	self_post([ LABEL ])
+	self_html([ LABEL ])
+
+	user_cookie([ NEW_VALUES ])
+	user_cookie_string()
+	user_cookie_param( KEY[, NEW_VALUES] )
+
+	user_input([ NEW_VALUES ])
+	user_input_string()
+	user_input_param( KEY[, NEW_VALUE] )
+	user_input_keywords()
+
+	persistant_user_input_params([ NEW_VALUES ])
+	persistant_user_input_string()
+	persistant_user_input_param( KEY[, NEW_VALUES] )
+	persistant_url()
+
+	redirect_url([ NEW_VALUE ]) -- POD for this available below
+	
+	get_http_headers()
+	
+	send_headers_to_user([ HTTP ])
+	send_content_to_user([ CONTENT ])
+	send_to_user([ HTTP[, CONTENT] ])
+	
+	parse_url_encoded_cookies( DO_LC_KEYS, ENCODED_STRS )
+	parse_url_encoded_queries( DO_LC_KEYS, ENCODED_STRS )
+
+=head1 DOCUMENTED FUNCTIONS AND METHODS
 
 =cut
 
@@ -336,6 +373,46 @@ my $DEF_SMTP_HOST = 'localhost';
 my $DEF_SMTP_TIMEOUT = 30;
 my $DEF_SITE_TITLE = 'Untitled Website';
 
+# Names of properties for objects of this class are declared here:
+
+# These properties are set only once because they correspond to user 
+# input that can only be gathered prior to this program starting up.
+my $KEY_INITIAL_UI = 'ui_initial_user_input';
+	my $IKEY_COOKIE   = 'user_cookie_str'; # cookies from browser
+	my $IKEY_QUERY    = 'user_query_str';  # query str from browser
+	my $IKEY_POST     = 'user_post_str';   # post data from browser
+	my $IKEY_OFFLINE  = 'user_offline_str'; # shell args / redirect
+	my $IKEY_OVERSIZE = 'is_oversize_post'; # true if cont len >max
+
+# These properties are not recursive, but are unlikely to get edited
+my $KEY_USER_COOKIE = 'ui_user_cookie'; # settings from browser cookies
+my $KEY_USER_INPUT  = 'ui_user_input';  # settings from browser query/post
+
+# These properties keep track of important user/pref data that should
+# be returned to the browser even if not recognized by subordinates.
+my $KEY_PERSIST_QUERY  = 'ui_persist_query';  # which qp persist for session
+	# this is used only when constructing new urls, and it stores just 
+	# the names of user input params whose values we are to return.
+
+# These properties relate to output headers
+my $KEY_REDIRECT_URL = 'uo_redirect_url';  # if def, str is redir header
+
+# Constant values used in this class go here:
+
+my $MAX_CONTENT_LENGTH = 100_000;  # currently limited to 100 kbytes
+my $UIP_KEYWORDS = '.keywords';  # user input param for ISINDEX queries
+
+# Names of properties for objects of this class are declared here:
+my $KEY_MAIN_BODY = 'uo_main_body';  # array of text -> <BODY>*</BODY>
+my $KEY_MAIN_HEAD = 'uo_main_head';  # array of text -> <HEAD>*</HEAD>
+my $KEY_TITLE     = 'uo_title';      # scalar of document title -> head
+my $KEY_AUTHOR    = 'uo_author';     # scalar of document author -> head
+my $KEY_META      = 'uo_meta';       # hash of meta keys/values -> head
+my $KEY_CSS_SRC   = 'uo_css_src';    # array of text -> head
+my $KEY_CSS_CODE  = 'uo_css_code';   # array of text -> head
+my $KEY_BODY_ATTR = 'uo_body_attr';  # hash of attrs -> <BODY *>
+my $KEY_REPLACE   = 'uo_replace';  # array of hashes, find and replace
+
 ######################################################################
 
 sub new {
@@ -350,9 +427,36 @@ sub new {
 sub initialize {
 	my ($self, $root, $delim, $prefs, $user_input) = @_;
 
-	$self->CGI::WPM::WebUserIO::initialize( $user_input );
-	$self->CGI::WPM::PageMaker::initialize();
+	if( $self->is_mod_perl() ) {
+		require Apache;
+		$| = 1;
+	}
 	
+	$self->{$KEY_INITIAL_UI} ||= $self->get_initial_user_input();
+	
+	$self->{$KEY_USER_COOKIE} = $self->parse_url_encoded_cookies( 1, 
+		$self->user_cookie_str() 
+	);
+	$self->{$KEY_USER_INPUT} = $self->parse_url_encoded_queries( 1, 
+		$self->user_query_str(), 
+		$self->user_post_str(), 
+		$self->user_offline_str() 
+	);
+	$self->{$KEY_PERSIST_QUERY} = {};
+	$self->{$KEY_REDIRECT_URL} = undef;
+	
+	$self->user_input( $user_input );
+
+	$self->{$KEY_MAIN_BODY} = [];
+	$self->{$KEY_MAIN_HEAD} = [];
+	$self->{$KEY_TITLE} = undef;
+	$self->{$KEY_AUTHOR} = undef;
+	$self->{$KEY_META} = {};
+	$self->{$KEY_CSS_SRC} = [];
+	$self->{$KEY_CSS_CODE} = [];	
+	$self->{$KEY_BODY_ATTR} = {};
+	$self->{$KEY_REPLACE} = [];
+
 	%{$self} = (
 		%{$self},
 		
@@ -402,8 +506,22 @@ are not changed.
 sub clone {
 	my ($self, $clone, @args) = @_;
 	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
-	$clone = $self->CGI::WPM::WebUserIO::clone( $clone );
-	$clone = $self->CGI::WPM::PageMaker::clone( $clone );
+
+	$clone->{$KEY_INITIAL_UI} = $self->{$KEY_INITIAL_UI};  # copy reference
+	$clone->{$KEY_USER_COOKIE} = $self->{$KEY_USER_COOKIE}->clone();
+	$clone->{$KEY_USER_INPUT} = $self->{$KEY_USER_INPUT}->clone();
+	$clone->{$KEY_PERSIST_QUERY} = {%{$self->{$KEY_PERSIST_QUERY}}};
+	$clone->{$KEY_REDIRECT_URL} = $self->{$KEY_REDIRECT_URL};
+
+	$clone->{$KEY_MAIN_BODY} = [@{$self->{$KEY_MAIN_BODY}}];
+	$clone->{$KEY_MAIN_HEAD} = [@{$self->{$KEY_MAIN_HEAD}}];
+	$clone->{$KEY_TITLE} = $self->{$KEY_TITLE};
+	$clone->{$KEY_AUTHOR} = $self->{$KEY_AUTHOR};
+	$clone->{$KEY_META} = {%{$self->{$KEY_META}}};
+	$clone->{$KEY_CSS_SRC} = [@{$self->{$KEY_CSS_SRC}}];
+	$clone->{$KEY_CSS_CODE} = [@{$self->{$KEY_CSS_CODE}}];
+	$clone->{$KEY_BODY_ATTR} = {%{$self->{$KEY_BODY_ATTR}}};
+	$clone->{$KEY_REPLACE} = $self->replacements();  # makes copy
 	
 	$clone->{$KEY_IS_DEBUG} = $self->{$KEY_IS_DEBUG};
 
@@ -428,16 +546,6 @@ sub clone {
 	$clone->{$KEY_OWNER_EM_VRP} = $self->{$KEY_OWNER_EM_VRP};
 
 	return( $clone );
-}
-
-######################################################################
-# Override same-named method in CGI::WPM::WebUserIO to acknowledge that we 
-# now store the page content within ourself.
-
-sub send_content_to_user {
-	my ($self, $content) = @_;
-	defined( $content ) or $content = $self->content_as_string();
-	$self->SUPER::send_content_to_user( $content );
 }
 
 ######################################################################
@@ -723,16 +831,6 @@ sub site_owner_email_html {
 }
 
 ######################################################################
-
-sub today_date_utc {
-	my ($sec, $min, $hour, $mday, $mon, $year) = gmtime(time);
-	$year += 1900;  # year counts from 1900 AD otherwise
-	$mon += 1;      # ensure January is 1, not 0
-	my @parts = ($year, $mon, $mday, $hour, $min, $sec);
-	return( sprintf( "%4.4d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d UTC", @parts ) );
-}
-
-######################################################################
 # Note: in order for this to work, the file must contain valid perl 
 # code that, when compiled, produces a valid HASH reference.
 
@@ -766,6 +864,741 @@ __endquote
 
 ######################################################################
 
+sub is_mod_perl {
+	return( $ENV{'GATEWAY_INTERFACE'} =~ /^CGI-Perl/ );
+}
+
+######################################################################
+
+sub user_cookie_str  { $_[0]->{$KEY_INITIAL_UI}->{$IKEY_COOKIE}   }
+sub user_query_str   { $_[0]->{$KEY_INITIAL_UI}->{$IKEY_QUERY}    }
+sub user_post_str    { $_[0]->{$KEY_INITIAL_UI}->{$IKEY_POST}     }
+sub user_offline_str { $_[0]->{$KEY_INITIAL_UI}->{$IKEY_OFFLINE}  }
+sub is_oversize_post { $_[0]->{$KEY_INITIAL_UI}->{$IKEY_OVERSIZE} }
+
+######################################################################
+
+sub request_method { $ENV{'REQUEST_METHOD'} || 'GET' }
+sub content_length { $ENV{'CONTENT_LENGTH'} + 0 }
+
+sub server_name { $ENV{'SERVER_NAME'} || 'localhost' }
+sub virtual_host { $ENV{'HTTP_HOST'} || $_[0]->server_name() }
+sub server_port { $ENV{'SERVER_PORT'} || 80 }
+sub script_name {
+	my $str = $ENV{'SCRIPT_NAME'};
+	$str =~ tr/+/ /;
+	$str =~ s/%([0-9a-fA-F]{2})/pack("c",hex($1))/ge;
+	return( $str );
+}
+
+sub http_referer {
+	my $str = $ENV{'HTTP_REFERER'};
+	$str =~ tr/+/ /;
+	$str =~ s/%([0-9a-fA-F]{2})/pack("c",hex($1))/ge;
+	return( $str );
+}
+
+sub remote_addr { $ENV{'REMOTE_ADDR'} || '127.0.0.1' }
+sub remote_host { $ENV{'REMOTE_HOST'} || $ENV{'REMOTE_ADDR'} || 
+	'localhost' }
+sub remote_user { $ENV{'AUTH_USER'} || $ENV{'LOGON_USER'} || 
+	$ENV{'REMOTE_USER'} || $ENV{'HTTP_FROM'} || $ENV{'REMOTE_IDENT'} }
+sub user_agent { $ENV{'HTTP_USER_AGENT'} }
+
+######################################################################
+
+sub base_url {
+	my $self = shift( @_ );
+	my $port = $self->server_port();
+	return( 'http://'.$self->virtual_host().
+		($port != 80 ? ":$port" : '').
+		$self->script_name() );
+}
+
+######################################################################
+
+sub self_url {
+	my $self = shift( @_ );
+	my $query = $self->user_query_str() || 
+		$self->user_offline_str();
+	return( $self->base_url().($query ? "?$query" : '') );
+}
+
+######################################################################
+
+sub self_post {
+	my $self = shift( @_ );
+	my $button_label = shift( @_ ) || 'click here';
+	my $url = $self->self_url();
+	my $post_fields = $self->parse_url_encoded_queries( 0, 
+		$self->user_post_str() )->to_html_encoded_hidden_fields();
+	return( <<__endquote );
+<FORM METHOD="post" ACTION="$url">
+$post_fields
+<INPUT TYPE="submit" NAME="" VALUE="$button_label">
+</FORM>
+__endquote
+}
+
+######################################################################
+
+sub self_html {
+	my $self = shift( @_ );
+	my $visible_text = shift( @_ ) || 'here';
+	return( $self->user_post_str() ? 
+		$self->self_post( $visible_text ) : 
+		'<A HREF="'.$self->self_url().'">'.$visible_text.'</A>' );
+}
+
+######################################################################
+
+sub user_cookie {
+	my $self = shift( @_ );
+	if( ref( my $new_value = shift( @_ ) ) eq 'CGI::MultiValuedHash' ) {
+		$self->{$KEY_USER_COOKIE} = $new_value->clone();
+	}
+	return( $self->{$KEY_USER_COOKIE} );
+}
+
+sub user_cookie_string {
+	my $self = shift( @_ );
+	return( $self->{$KEY_USER_COOKIE}->to_url_encoded_string('; ','&') );
+}
+
+sub user_cookie_param {
+	my $self = shift( @_ );
+	my $key = shift( @_ );
+	if( @_ ) {
+		return( $self->{$KEY_USER_COOKIE}->store( $key, @_ ) );
+	} elsif( wantarray ) {
+		return( @{$self->{$KEY_USER_COOKIE}->fetch( $key ) || []} );
+	} else {
+		return( $self->{$KEY_USER_COOKIE}->fetch_value( $key ) );
+	}
+}
+
+######################################################################
+
+sub user_input {
+	my $self = shift( @_ );
+	if( ref( my $new_value = shift( @_ ) ) eq 'CGI::MultiValuedHash' ) {
+		$self->{$KEY_USER_INPUT} = $new_value->clone();
+	}
+	return( $self->{$KEY_USER_INPUT} );
+}
+
+sub user_input_string {
+	my $self = shift( @_ );
+	return( $self->{$KEY_USER_INPUT}->to_url_encoded_string() );
+}
+
+sub user_input_param {
+	my $self = shift( @_ );
+	my $key = shift( @_ );
+	if( @_ ) {
+		return( $self->{$KEY_USER_INPUT}->store( $key, @_ ) );
+	} elsif( wantarray ) {
+		return( @{$self->{$KEY_USER_INPUT}->fetch( $key ) || []} );
+	} else {
+		return( $self->{$KEY_USER_INPUT}->fetch_value( $key ) );
+	}
+}
+
+sub user_input_keywords {
+	my $self = shift( @_ );
+	return( @{$self->{$KEY_USER_INPUT}->fetch( $UIP_KEYWORDS )} );
+}
+
+######################################################################
+
+sub persistant_user_input_params {
+	my $self = shift( @_ );
+	if( ref( my $new_value = shift( @_ ) ) eq 'HASH' ) {
+		$self->{$KEY_PERSIST_QUERY} = {%{$new_value}};
+	}
+	return( $self->{$KEY_PERSIST_QUERY} );
+}
+
+sub persistant_user_input_string {
+	my $self = shift( @_ );
+	return( $self->{$KEY_USER_INPUT}->fetch_mvh( 
+		[keys %{$self->{$KEY_PERSIST_QUERY}}] 
+		)->to_url_encoded_string() );
+}
+
+sub persistant_user_input_param {
+	my $self = shift( @_ );
+	my $key = shift( @_ );
+	if( defined( my $new_value = shift( @_ ) ) ) {
+		$self->{$KEY_PERSIST_QUERY}->{$key} = $new_value;
+	}	
+	return( $self->{$KEY_PERSIST_QUERY}->{$key} );
+}
+
+sub persistant_url {
+	my $self = shift( @_ );
+	my $persist_input_str = $self->persistant_user_input_string();
+	return( $self->base_url().
+		($persist_input_str ? "?$persist_input_str" : '') );
+}
+
+######################################################################
+
+=head2 redirect_url([ VALUE ])
+
+This method is an accessor for the "redirect url" scalar property of this object,
+which it returns.  If VALUE is defined, this property is set to it.  If this
+property is defined, then an http redirection header will be returned to the user 
+instead of an ordinary web page.
+
+=cut
+
+######################################################################
+
+sub redirect_url {
+	my $self = shift( @_ );
+	if( defined( my $new_value = shift( @_ ) ) ) {
+		$self->{$KEY_REDIRECT_URL} = $new_value;
+	}
+	return( $self->{$KEY_REDIRECT_URL} );
+}
+
+######################################################################
+
+sub get_http_headers {
+	my $self = shift( @_ );
+
+	require HTTP::Headers;
+	my $http = HTTP::Headers->new();
+
+	if( my $url = $self->{$KEY_REDIRECT_URL} ) {
+		$http->header( 
+			status => '301 Moved',  # used to be "302 Found"
+			uri => $url,
+			location => $url,
+		);
+
+	} else {
+		$http->header( 
+			status => '200 OK',
+			content_type => 'text/html',
+		);
+	}
+
+	return( $http );  # return HTTP headers object
+}
+
+######################################################################
+
+sub send_headers_to_user {
+	my ($self, $http) = @_;
+	ref( $http ) eq 'HTTP::Headers' or $http = $self->get_http_headers();
+
+	if( $self->is_mod_perl() ) {
+		my $req = Apache->request();
+		$http->scan( sub { $req->cgi_header_out( @_ ); } );			
+
+	} else {
+		my $endl = "\015\012";  # cr + lf
+		print STDOUT $http->as_string( $endl ).$endl;
+	}
+}
+
+sub send_content_to_user {
+	my ($self, $content) = @_;
+	defined( $content ) or $content = $self->content_as_string();
+	print STDOUT $content;
+}
+
+sub send_to_user {
+	my ($self, $http, $content) = @_;
+	$self->send_headers_to_user( $http );
+	$self->send_content_to_user( $content );
+}
+
+######################################################################
+
+sub parse_url_encoded_cookies {
+	my $self = shift( @_ );
+	my $parsed = CGI::MultiValuedHash->new( shift( @_ ) );
+	foreach my $string (@_) {
+		$string =~ s/\s+/ /g;
+		$parsed->from_url_encoded_string( $string, '; ', '&' );
+	}
+	return( $parsed );
+}
+
+sub parse_url_encoded_queries {
+	my $self = shift( @_ );
+	my $parsed = CGI::MultiValuedHash->new( shift( @_ ) );
+	foreach my $string (@_) {
+		$string =~ s/\s+/ /g;
+		if( $string =~ /=/ ) {
+			$parsed->from_url_encoded_string( $string );
+		} else {
+			$parsed->from_url_encoded_string( 
+				"$UIP_KEYWORDS=$string", undef, ' ' );
+		}
+	}
+	return( $parsed );
+}
+
+######################################################################
+# This collects user input, and should only be called once by a program
+# for the reason that multiple POST reads from STDIN can cause a hang 
+# if the extra data isn't there.
+
+sub get_initial_user_input {
+	my $self = shift( @_ );
+	my %iui = ();
+
+	$iui{$IKEY_COOKIE} = $ENV{'HTTP_COOKIE'} || $ENV{'COOKIE'};
+	
+	if( $ENV{'REQUEST_METHOD'} =~ /^(GET|HEAD|POST)$/ ) {
+		$iui{$IKEY_QUERY} = $ENV{'QUERY_STRING'};
+		$iui{$IKEY_QUERY} ||= $ENV{'REDIRECT_QUERY_STRING'};
+		
+		if( $ENV{'CONTENT_LENGTH'} <= $MAX_CONTENT_LENGTH ) {
+			read( STDIN, $iui{$IKEY_POST}, $ENV{'CONTENT_LENGTH'} );
+			chomp( $iui{$IKEY_POST} );
+		} else {  # post too large, error condition, post not taken
+			$iui{$IKEY_OVERSIZE} = $MAX_CONTENT_LENGTH;
+		}
+
+	} elsif( $ARGV[0] ) {  # allow caller to save $ARGV[1..n] for themselves
+		$iui{$IKEY_OFFLINE} = $ARGV[0];
+
+	} else {
+		print STDERR "offline mode: enter query string on standard input\n";
+		print STDERR "it must be query-escaped and all one one line\n";
+		$iui{$IKEY_OFFLINE} = <STDIN>;
+		chomp( $iui{$IKEY_OFFLINE} );
+	}
+
+	return( \%iui );
+}
+
+######################################################################
+
+=head2 body_content([ VALUES ])
+
+This method is an accessor for the "body content" list property of this object,
+which it returns.  This property is used literally to go between the "body" tag
+pair of a new HTML document.  If VALUES is defined, this property is set to it,
+and replaces any existing content.  VALUES can be any kind of valid list.  If the
+first argument to this method is an ARRAY ref then that is taken as the entire
+list; otherwise, all the arguments are taken as elements in a list.
+
+=cut
+
+######################################################################
+
+sub body_content {
+	my $self = shift( @_ );
+	if( defined( $_[0] ) ) {
+		$self->{$KEY_MAIN_BODY} = 
+			(ref( $_[0] ) eq 'ARRAY') ? [@{$_[0]}] : [@_];
+	}
+	return( $self->{$KEY_MAIN_BODY} );  # returns ref
+}
+
+######################################################################
+
+=head2 head_content([ VALUES ])
+
+This method is an accessor for the "head content" list property of this object,
+which it returns.  This property is used literally to go between the "head" tag
+pair of a new HTML document.  If VALUES is defined, this property is set to it,
+and replaces any existing content.  VALUES can be any kind of valid list.  If the
+first argument to this method is an ARRAY ref then that is taken as the entire
+list; otherwise, all the arguments are taken as elements in a list.
+
+=cut
+
+######################################################################
+
+sub head_content {
+	my $self = shift( @_ );
+	if( defined( $_[0] ) ) {
+		$self->{$KEY_MAIN_HEAD} = 
+			(ref( $_[0] ) eq 'ARRAY') ? [@{$_[0]}] : [@_];
+	}
+	return( $self->{$KEY_MAIN_HEAD} );  # returns ref
+}
+
+######################################################################
+
+=head2 title([ VALUE ])
+
+This method is an accessor for the "title" scalar property of this object, which
+it returns.  If VALUE is defined, this property is set to it.  This property is
+used in the header of a new document to define its title.  Specifically, it goes
+between a <TITLE></TITLE> tag pair.
+
+=cut
+
+######################################################################
+
+sub title {
+	my $self = shift( @_ );
+	if( defined( my $new_value = shift( @_ ) ) ) {
+		$self->{$KEY_TITLE} = $new_value;
+	}
+	return( $self->{$KEY_TITLE} );  # ret copy
+}
+
+######################################################################
+
+=head2 author([ VALUE ])
+
+This method is an accessor for the "author" scalar property of this object, which
+it returns.  If VALUE is defined, this property is set to it.  This property is
+used in the header of a new document to define its author.  Specifically, it is
+used in a new '<LINK REV="made">' tag if defined.
+
+=cut
+
+######################################################################
+
+sub author {
+	my $self = shift( @_ );
+	if( defined( my $new_value = shift( @_ ) ) ) {
+		$self->{$KEY_AUTHOR} = $new_value;
+	}
+	return( $self->{$KEY_AUTHOR} );  # ret copy
+}
+
+######################################################################
+
+=head2 meta([ KEY[, VALUE] ])
+
+This method is an accessor for the "meta" hash property of this object, which it
+returns.  If KEY is defined and it is a valid HASH ref, then this property is set
+to it.  If KEY is defined but is not a HASH ref, then it is treated as a single
+key into the hash of meta information, and the value associated with that hash
+key is returned.  In the latter case, if VALUE is defined, then that new value is
+assigned to the approprate meta key.  Meta information is used in the header of a
+new document to say things like what the best keywords are for a search engine to
+index this page under.  If this property is defined, then a '<META NAME="n"
+VALUE="v">' tag would be made for each key/value pair.
+
+=cut
+
+######################################################################
+
+sub meta {
+	my $self = shift( @_ );
+	if( ref( my $first = shift( @_ ) ) eq 'HASH' ) {
+		$self->{$KEY_META} = {%{$first}};
+	} elsif( defined( $first ) ) {
+		if( defined( my $second = shift( @_ ) ) ) {
+			$self->{$KEY_META}->{$first} = $second;
+		}
+		return( $self->{$KEY_META}->{$first} );
+	}
+	return( $self->{$KEY_META} );  # returns ref
+}
+
+######################################################################
+
+=head2 style_sources([ VALUES ])
+
+This method is an accessor for the "style sources" list property of this object,
+which it returns.  If VALUES is defined, this property is set to it, and replaces
+any existing content.  VALUES can be any kind of valid list.  If the first
+argument to this method is an ARRAY ref then that is taken as the entire list;
+otherwise, all the arguments are taken as elements in a list.  This property is
+used in the header of a new document for linking in CSS definitions that are
+contained in external documents; CSS is used by web browsers to describe how a
+page is visually presented.  If this property is defined, then a '<LINK
+REL="stylesheet" SRC="url">' tag would be made for each list element.
+
+=cut
+
+######################################################################
+
+sub style_sources {
+	my $self = shift( @_ );
+	if( defined( $_[0] ) ) {
+		$self->{$KEY_CSS_SRC} = 
+			(ref( $_[0] ) eq 'ARRAY') ? [@{$_[0]}] : [@_];
+	}
+	return( $self->{$KEY_CSS_SRC} );  # returns ref
+}
+
+######################################################################
+
+=head2 style_code([ VALUES ])
+
+This method is an accessor for the "style code" list property of this object,
+which it returns.  If VALUES is defined, this property is set to it, and replaces
+any existing content.  VALUES can be any kind of valid list.  If the first
+argument to this method is an ARRAY ref then that is taken as the entire list;
+otherwise, all the arguments are taken as elements in a list.  This property is
+used in the header of a new document for embedding CSS definitions in that
+document; CSS is used by web browsers to describe how a page is visually
+presented.  If this property is defined, then a "<STYLE><!-- code --></STYLE>"
+multi-line tag is made for them.
+
+=cut
+
+######################################################################
+
+sub style_code {
+	my $self = shift( @_ );
+	if( defined( $_[0] ) ) {
+		$self->{$KEY_CSS_CODE} = 
+			(ref( $_[0] ) eq 'ARRAY') ? [@{$_[0]}] : [@_];
+	}
+	return( $self->{$KEY_CSS_CODE} );  # returns ref
+}
+
+######################################################################
+
+=head2 body_attributes([ KEY[, VALUE] ])
+
+This method is an accessor for the "body attributes" hash property of this
+object, which it returns.  If KEY is defined and it is a valid HASH ref, then
+this property is set to it.  If KEY is defined but is not a HASH ref, then it is
+treated as a single key into the hash of body attributes, and the value
+associated with that hash key is returned.  In the latter case, if VALUE is
+defined, then that new value is assigned to the approprate attribute key.  Body
+attributes define such things as the background color the page should use, and
+have names like 'bgcolor' and 'background'.  If this property is defined, then
+the attribute keys and values go inside the opening <BODY> tag of a new document.
+
+=cut
+
+######################################################################
+
+sub body_attributes {
+	my $self = shift( @_ );
+	if( ref( my $first = shift( @_ ) ) eq 'HASH' ) {
+		$self->{$KEY_BODY_ATTR} = {%{$first}};
+	} elsif( defined( $first ) ) {
+		if( defined( my $second = shift( @_ ) ) ) {
+			$self->{$KEY_BODY_ATTR}->{$first} = $second;
+		}
+		return( $self->{$KEY_BODY_ATTR}->{$first} );
+	}
+	return( $self->{$KEY_BODY_ATTR} );  # returns ref
+}
+
+######################################################################
+
+=head2 replacements([ VALUES ])
+
+This method is an accessor for the "replacements" array-of-hashes property of
+this object, which it returns.  If VALUES is defined, this property is set to it,
+and replaces any existing content.  VALUES can be any kind of valid list whose
+elements are hashes.  This property is used in implementing this class'
+search-and-replace functionality.  Within each hash, the keys define tokens that
+we search our content for and the values are what we replace occurances with. 
+Replacements are priortized by having multiple hashes; the hashes that are
+earlier in the "replacements" list are performed before those later in the list.
+
+=cut
+
+######################################################################
+
+sub replacements {
+	my $self = shift( @_ );
+	if( defined( $_[0] ) ) {
+		my @new_values = (ref($_[0]) eq 'ARRAY') ? @{$_[0]} : @_;
+		my @new_list = ();
+		foreach my $element (@new_values) {
+			ref( $element ) eq 'HASH' or next;
+			push( @new_list, {%{$element}} );
+		}
+		$self->{$KEY_REPLACE} = \@new_list;
+	}
+	return( [map { {%{$_}} } @{$self->{$KEY_REPLACE}}] );  # ret copy
+}
+
+######################################################################
+
+=head2 body_append( VALUES )
+
+This method appends new elements to the "body content" list property of this
+object, and that entire property is returned.
+
+=cut
+
+######################################################################
+
+sub body_append {
+	my $self = shift( @_ );
+	my $ra_values = (ref( $_[0] ) eq 'ARRAY') ? shift( @_ ) : \@_;
+	push( @{$self->{$KEY_MAIN_BODY}}, @{$ra_values} );
+	return( $self->{$KEY_MAIN_BODY} );  # returns ref
+}
+
+######################################################################
+
+=head2 body_prepend( VALUES )
+
+This method prepends new elements to the "body content" list property of this
+object, and that entire property is returned.
+
+=cut
+
+######################################################################
+
+sub body_prepend {
+	my $self = shift( @_ );
+	my $ra_values = (ref( $_[0] ) eq 'ARRAY') ? shift( @_ ) : \@_;
+	unshift( @{$self->{$KEY_MAIN_BODY}}, @{$ra_values} );
+	return( $self->{$KEY_MAIN_BODY} );  # returns ref
+}
+
+######################################################################
+
+=head2 head_append( VALUES )
+
+This method appends new elements to the "head content" list property of this
+object, and that entire property is returned.
+
+=cut
+
+######################################################################
+
+sub head_append {
+	my $self = shift( @_ );
+	my $ra_values = (ref( $_[0] ) eq 'ARRAY') ? shift( @_ ) : \@_;
+	push( @{$self->{$KEY_MAIN_HEAD}}, @{$ra_values} );
+	return( $self->{$KEY_MAIN_HEAD} );  # returns ref
+}
+
+######################################################################
+
+=head2 head_prepend( VALUES )
+
+This method prepends new elements to the "head content" list property of this
+object, and that entire property is returned.
+
+=cut
+
+######################################################################
+
+sub head_prepend {
+	my $self = shift( @_ );
+	my $ra_values = (ref( $_[0] ) eq 'ARRAY') ? shift( @_ ) : \@_;
+	unshift( @{$self->{$KEY_MAIN_HEAD}}, @{$ra_values} );
+	return( $self->{$KEY_MAIN_HEAD} );  # returns ref
+}
+
+######################################################################
+
+=head2 add_earlier_replace( VALUE )
+
+This method prepends a new hash, defined by VALUE, to the "replacements"
+list-of-hashes property of this object such that keys and values in the new hash
+are searched and replaced earlier than any existing ones.  Nothing is returned.
+
+=cut
+
+######################################################################
+
+sub add_earlier_replace {
+	my $self = shift( @_ );
+	if( ref( my $new_value = shift( @_ ) ) eq 'HASH' ) {
+		unshift( @{$self->{$KEY_REPLACE}}, {%{$new_value}} );
+	}
+}
+
+######################################################################
+
+=head2 add_later_replace( VALUE )
+
+This method appends a new hash, defined by VALUE, to the "replacements"
+list-of-hashes property of this object such that keys and values in the new hash
+are searched and replaced later than any existing ones.  Nothing is returned.
+
+=cut
+
+######################################################################
+
+sub add_later_replace {
+	my $self = shift( @_ );
+	if( ref( my $new_value = shift( @_ ) ) eq 'HASH' ) {
+		push( @{$self->{$KEY_REPLACE}}, {%{$new_value}} );
+	}
+}
+
+######################################################################
+
+=head2 do_replacements()
+
+This method performs a search-and-replace of the "body content" property as
+defined by the "replacements" property of this object.  This method is always
+called by to_string() prior to the latter assembling a web page.
+
+=cut
+
+######################################################################
+
+sub do_replacements {
+	my $self = shift( @_ );
+	my $body = join( '', @{$self->{$KEY_MAIN_BODY}} );
+	foreach my $rh_pairs (@{$self->{$KEY_REPLACE}}) {
+		foreach my $find_val (keys %{$rh_pairs}) {
+			my $replace_val = $rh_pairs->{$find_val};
+			$body =~ s/$find_val/$replace_val/g;
+		}
+	}
+	$self->{$KEY_MAIN_BODY} = [$body];
+}
+
+######################################################################
+
+=head2 content_as_string()
+
+This method returns a scalar containing the complete HTML page that this object
+describes, that is, it returns the string representation of this object.  This 
+consists of a prologue tag, a pair of "html" tags and everything in between.  
+This method requires HTML::EasyTags to do the actual page assembly, and so the 
+results are consistant with its abilities.
+
+=cut
+
+######################################################################
+
+sub content_as_string {
+	my $self = shift( @_ );
+
+	$self->do_replacements();
+
+	require HTML::EasyTags;
+	my $html = HTML::EasyTags->new();
+
+	my ($title,$author,$meta,$css_src,$css_code);
+
+	$self->{$KEY_AUTHOR} and $author = 
+		$html->link( rev => 'made', href => "mailto:$self->{$KEY_AUTHOR}" );
+
+	%{$self->{$KEY_META}} and $meta = join( '', map { 
+		$html->meta_group( name => $_, value => $self->{$KEY_META}->{$_} ) 
+		} keys %{$self->{$KEY_META}} );
+
+	@{$self->{$KEY_CSS_SRC}} and $css_src = $html->link_group( 
+		rel => 'stylesheet', type => 'text/css', href => $self->{$KEY_CSS_SRC} );
+
+	@{$self->{$KEY_CSS_CODE}} and $css_code = 
+		$html->style( $html->comment_tag( $self->{$KEY_CSS_CODE} ) );
+
+	return( join( '', 
+		$html->start_html(
+			$self->{$KEY_TITLE},
+			[ $author, $meta, $css_src, $css_code, @{$self->{$KEY_MAIN_HEAD}} ], 
+			$self->{$KEY_BODY_ATTR}, 
+		), 
+		@{$self->{$KEY_MAIN_BODY}},
+		$html->end_html(),
+	) );
+}
+
+######################################################################
+
 1;
 __END__
 
@@ -786,6 +1619,7 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::PageMaker, CGI::WPM::WebUserIO, CGI::WPM::Base.
+perl(1), mod_perl, CGI::WPM::Base, CGI::MultiValuedHash, HTML::EasyTags, 
+HTTP::Headers, Apache.
 
 =cut

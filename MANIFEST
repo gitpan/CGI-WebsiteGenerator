@@ -1,6 +1,6 @@
 Base.pm
 ChangeLog
-EventCountFile.pm
+CountFile.pm
 FileVirtualPath.pm
 Globals.pm
 GuestBook.pm
@@ -8,11 +8,9 @@ MailForm.pm
 Makefile.PL
 MANIFEST
 MultiPage.pm
-PageMaker.pm
 ReadMe
 Redirect.pm
 SegTextDoc.pm
 Static.pm
 test.pl
 Usage.pm
-WebUserIO.pm

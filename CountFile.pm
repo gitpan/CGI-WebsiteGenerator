@@ -1,6 +1,6 @@
 =head1 NAME
 
-CGI::WPM::EventCountFile - Perl module that interfaces to a tab-delimited text file
+CGI::WPM::CountFile - Perl module that interfaces to a tab-delimited text file
 for storing date-bounded counts of occurances for multiple events, such as web
 page views.
 
@@ -8,7 +8,7 @@ page views.
 
 ######################################################################
 
-package CGI::WPM::EventCountFile;
+package CGI::WPM::CountFile;
 require 5.004;
 
 # Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '1.04';
+$VERSION = '0.36';
 
 ######################################################################
 
@@ -49,7 +49,7 @@ use Symbol;
 
 =head1 SYNOPSIS
 
-	use CGI::WPM::EventCountFile;
+	use CGI::WPM::CountFile;
 	
 	MAIN: {
 		$self->mail_me_and_reset_counts_if_new_day( "counts.txt" );
@@ -66,7 +66,7 @@ use Symbol;
 
 		push( @keys_to_inc, '__total__' );
 
-		my $count_file = CGI::WPM::EventCountFile->new( $file_path, 1 );
+		my $count_file = CGI::WPM::CountFile->new( $file_path, 1 );
 		$count_file->open_and_lock( 1 ) or return( 0 );
 		$count_file->read_all_records();
 
@@ -82,7 +82,7 @@ use Symbol;
 	sub mail_me_and_reset_counts_if_new_day {
 		my ($self, $file_path) = @_;
 	
-		my $dcm_file = CGI::WPM::EventCountFile->new( $file_path, 1 );
+		my $dcm_file = CGI::WPM::CountFile->new( $file_path, 1 );
 		$dcm_file->open_and_lock( 1 ) or do {
 			print "<!-- ".$dcm_file->is_error()." -->\n";
 			return( undef );
@@ -227,7 +227,7 @@ the ability to change this behaviour in later revisions of the class.
 
 =head2 new([ FILE[, CREAT[, PERMS]] ])
 
-This function creates a new CGI::WPM::EventCountFile object and returns it.  The first
+This function creates a new CGI::WPM::CountFile object and returns it.  The first
 optional parameter, FILE, can be either a filehandle (GLOB ref) or a scalar.  If
 it is a filehandle, then the "file handle" property is set to it, and all other
 parameters are ignored.  If it is a scalar, then the "file path" property is set
@@ -280,7 +280,7 @@ This method initializes a new object to have all of the same properties of the
 current object and returns it.  This new object can be provided in the optional
 argument CLONE (if CLONE is an object of the same class as the current object);
 otherwise, a brand new object of the current class is used.  Only object 
-properties recognized by CGI::WPM::EventCountFile are set in the clone; other 
+properties recognized by CGI::WPM::CountFile are set in the clone; other 
 properties are not changed.  
 
 Note that the internally stored filehandle (glob ref) is duplicated using an 
@@ -292,7 +292,7 @@ actual filehandle as the original or a different one.
 ######################################################################
 
 sub clone {
-	my ($self, $clone, @args) = @_;
+	my ($self, $clone) = @_;
 	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
 
 	$clone->{$KEY_FILEHANDLE} = $self->{$KEY_FILEHANDLE};
@@ -938,6 +938,6 @@ the flexability to create nonexistant files on demand.
 
 =head1 SEE ALSO
 
-perl(1), Fcntl.
+perl(1), Fcntl, Symbol.
 
 =cut

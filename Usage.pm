@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.35';
+$VERSION = '0.36';
 
 ######################################################################
 
@@ -36,7 +36,7 @@ $VERSION = '0.35';
 
 	CGI::WPM::Base 0.34
 	CGI::WPM::Globals 0.34
-	CGI::WPM::EventCountFile 1.04
+	CGI::WPM::CountFile 0.36
 
 =cut
 
@@ -44,7 +44,7 @@ $VERSION = '0.35';
 
 use CGI::WPM::Base 0.34;
 @ISA = qw(CGI::WPM::Base);
-use CGI::WPM::EventCountFile 1.04;
+use CGI::WPM::CountFile 0.36;
 
 ######################################################################
 
@@ -283,7 +283,7 @@ sub email_and_reset_counts_if_new_day {
 	$rh_prefs->{$PKEY_EMAIL_LOGS} or return( 1 );
 
 	$globals->add_no_error();
-	my $dcm_file = CGI::WPM::EventCountFile->new( 
+	my $dcm_file = CGI::WPM::CountFile->new( 
 		$globals->phys_filename_string( $rh_prefs->{$PKEY_FN_DCM} ), 1 );
 	$dcm_file->open_and_lock( 1 ) or do {
 		$globals->add_error( $dcm_file->is_error() );
@@ -313,7 +313,7 @@ sub email_and_reset_counts_if_new_day {
 
 		foreach my $filename (@{$ra_filenames}) {
 			$filename or next;
-			my $count_file = CGI::WPM::EventCountFile->new( 
+			my $count_file = CGI::WPM::CountFile->new( 
 				$globals->phys_filename_string( $filename ), 1 );
 			$count_file->open_and_lock( 1 ) or do {
 				push( @mail_body, "\n\n".$count_file->is_error()."\n" );
@@ -331,7 +331,7 @@ sub email_and_reset_counts_if_new_day {
 			$count_file->unlock_and_close();
 		}
 
-		my ($today_str) = ($globals->today_date_utc() =~ m/^(\S+)/ );
+		my ($today_str) = ($self->_today_date_utc() =~ m/^(\S+)/ );
 		my $subject_unique = $rh_mail_pref->{$MKEY_SUBJECT_UNIQUE};
 		defined( $subject_unique) or $subject_unique = ' -- usage to ';
 
@@ -522,7 +522,7 @@ sub update_one_count_file {
 
 	push( @keys_to_inc, $rh_prefs->{$PKEY_TOKEN_TOTAL} );
 
-	my $count_file = CGI::WPM::EventCountFile->new( 
+	my $count_file = CGI::WPM::CountFile->new( 
 		$globals->phys_filename_string( $filename ), 1 );
 	$count_file->open_and_lock( 1 ) or return( 0 );
 	$count_file->read_all_records();
@@ -552,7 +552,7 @@ sub _send_email_message {
 	
 	my $body_header = <<__endquote.
 --------------------------------------------------
-This e-mail was sent at @{[$globals->today_date_utc()]} 
+This e-mail was sent at @{[$self->_today_date_utc()]} 
 by the web site "@{[$globals->site_title()]}", 
 which is located at "@{[$globals->base_url()]}".
 __endquote
@@ -626,6 +626,16 @@ __endquote
 
 ######################################################################
 
+sub _today_date_utc {
+	my ($sec, $min, $hour, $mday, $mon, $year) = gmtime(time);
+	$year += 1900;  # year counts from 1900 AD otherwise
+	$mon += 1;      # ensure January is 1, not 0
+	my @parts = ($year, $mon, $mday, $hour, $min, $sec);
+	return( sprintf( "%4.4d-%2.2d-%2.2d %2.2d:%2.2d:%2.2d UTC", @parts ) );
+}
+
+######################################################################
+
 1;
 __END__
 
@@ -646,6 +656,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::EventCountFile, Net::SMTP.
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::CountFile, Net::SMTP.
 
 =cut
