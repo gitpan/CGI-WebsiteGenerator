@@ -21,7 +21,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION);
-$VERSION = '0.31';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -49,11 +49,70 @@ use CGI::WPM::Globals 0.3;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 How A Subclass Is Called
+
+	require CGI::WPM::Globals;  # to hold our input, output, preferences
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+	
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
+
+	require HelloWorld;  # all content is made through here
+	$globals->move_current_srp( 'content' );  # subdir holding content files
+	$globals->move_site_prefs( {'text' => 'hey you'} );  # configuration details
+	HelloWorld->execute( $globals );  # do all the work
+	$globals->restore_site_prefs();  # rewind configuration context
+	$globals->restore_last_srp();  # rewind subdir context
+
+	$globals->send_to_user();  # send output now that everything's ready
+
+=head2 A Simple Hello World Subclass
+
+	package HelloWorld;
+	require 5.004;
+
+	use strict;
+	use vars qw($VERSION @ISA);
+	$VERSION = '0.01';
+
+	use CGI::WPM::Base 0.3;
+	@ISA = qw(CGI::WPM::Base);
+
+	sub _dispatch_by_user {
+		my $self = shift( @_ );
+		my $globals = $self->{'site_globals'};
+
+		$globals->title( $globals->site_title().' - Hello World' );
+		$globals->body_content( <<__endquote );
+	<H2 ALIGN="center">@{[$globals->title()]}</H2>
+
+	<P>This module doesn't do anything interesting, but what the hey, 
+	everyone has to do a "hello world" program sometime.</P>
+	
+	<P>Oh, and the main program says @{[$globals->site_pref( 'text' )]}.</P>
+	
+	<P>You can write to @{[$globals->site_owner_name()]} 
+	at @{[$globals->site_owner_email()]}.</P>
+	
+	<P>Click <A HREF="@{[$globals->self_url()]}">here</A> to call me back.</P>
+	__endquote
+	}
+
+	1;
 
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+The above module can be its own complete web site, or it can be one page on a 
+larger site, it's up to you to decide.  Also, there can be multiple pages made 
+by the same HelloWorld module, with their preferences differentiating them.
+Any WPM module can call others in turn, and each call should be preceeded and 
+followed by setting/rewinding the context for the inner module.  Each module can 
+act like it is the only one in the system, whether that is true or not.  But 
+follow proper programming protocols like only unwinding contexts you set, and 
+vice-versa.  The Globals object does not enforce anything like that.
 
 =head1 SYNTAX
 
@@ -75,12 +134,16 @@ I<This POD is coming when I get the time to write it.>
 	dispatch_by_admin()
 	finalize() - replaces the depreciated shim finalize_page_content()
 
+Note that the second approach is depreciated, and only execute() should be used.
+In release 0.4 the second approach will not be available.
+
 =head1 PREFERENCES HANDLED BY THIS MODULE
 
 I<This POD is coming when I get the time to write it.>
 
-	amend_msg  # personalized html appears on error page
+	amend_msg  # personalized html appears on error page instead of subc action
 
+	page_body    # if defined, no subclass is used and this literal used instead
 	page_header  # content goes above our subclass's
 	page_footer  # content goes below our subclass's
 	page_title   # title for this document
@@ -118,6 +181,8 @@ my $KEY_SITE_GLOBALS = 'site_globals';  # hold global site values
 my $PKEY_AMEND_MSG = 'amend_msg';  # personalized html appears on error page
 
 # Keys for items in site page preferences:
+my $PKEY_PAGE_BODY = 'page_body';  # if defined, use literally *as* content
+
 my $PKEY_PAGE_HEADER = 'page_header'; # content goes above our subclass's
 my $PKEY_PAGE_FOOTER = 'page_footer'; # content goes below our subclass's
 my $PKEY_PAGE_TITLE = 'page_title';  # title for this document
@@ -172,11 +237,14 @@ sub _initialize {
 
 sub dispatch_by_user {
 	my $self = shift( @_ );
-	if( $self->{$KEY_SITE_GLOBALS}->get_error() ) {  # prefs not open
+	my $globals = $self->{$KEY_SITE_GLOBALS};	
+	if( $globals->get_error() ) {  # prefs not open
 		$self->_set_to_init_error_page();
 		return( 0 );
 	}
-	return( $self->_dispatch_by_user( @_ ) );
+	my $body = $globals->site_prefs()->{$PKEY_PAGE_BODY};
+	return( defined( $body ) ? $globals->body_content( $body ) : 
+		$self->_dispatch_by_user( @_ ) );
 }
 
 # subclass should have their own of these
@@ -204,11 +272,14 @@ __endquote
 
 sub dispatch_by_admin {
 	my $self = shift( @_ );
-	if( $self->{$KEY_SITE_GLOBALS}->get_error() ) {  # prefs not open
+	my $globals = $self->{$KEY_SITE_GLOBALS};	
+	if( $globals->get_error() ) {  # prefs not open
 		$self->_set_to_init_error_page();
 		return( 0 );
 	}
-	return( $self->_dispatch_by_admin( @_ ) );
+	my $body = $globals->site_prefs()->{$PKEY_PAGE_BODY};
+	return( defined( $body ) ? $globals->body_content( $body ) : 
+		$self->_dispatch_by_admin( @_ ) );
 }
 
 # subclass should have their own of these, if needed
@@ -338,6 +409,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Globals.
 
 =cut

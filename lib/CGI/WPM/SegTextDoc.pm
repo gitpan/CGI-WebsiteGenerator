@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -50,11 +50,52 @@ use CGI::WPM::Static 0.3;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 Display A Text File In Multiple Segments
+
+	require CGI::WPM::Globals;
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );
+
+	$globals->user_vrp( lc( $globals->user_input_param(  # fetch extra path info...
+		$globals->vrp_param_name( 'path' ) ) ) );  # to know what page user wants
+	$globals->current_user_vrp_level( 1 );  # get ready to examine start of vrp
+	
+	require CGI::WPM::Static;
+	$globals->move_site_prefs( {
+		title => 'Index of the World',
+		author => 'Jules Verne',
+		created => 'Version 1.0, first created 1993 June 24',
+		updated => 'Version 3.1, last modified 2000 November 18',
+		filename => 'jv_world.txt',
+		segments => 24,
+	} );
+	CGI::WPM::Static->execute( $globals );  # content-type: text/html
+	
+	$globals->send_to_user();
+
+I<You need to have a subdirectory named "jv_world" that contains the 24 files 
+that correspond to the segments, named "jv_world_001.txt" through "...024.txt".>
+
+=head2 Display A Text File All On One Page
+
+	$globals->move_site_prefs( {
+		title => 'Pizza Joints In New York',
+		author => 'Oscar Wilder',
+		created => 'Version 0.5, first created 1997 February 17',
+		updated => 'Version 1.2, last modified 1998 March 8',
+		filename => 'ow_pizza.txt',
+		segments => 1,  # also the default
+	} );
+
+I<You need to have a single file named "ow_pizza.txt", not in a subdirectory.>
 
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+When the file is in multiple segments, a subdirectory is used to hold the pieces.  
+When the file is in one part, there is no subdirectory.  Multipart documents have 
+a navigation bar automatically generated to go between them.  Documents are 
+assumed to be plain text, and are HTML escaped.
 
 =head1 SYNTAX
 
@@ -245,6 +286,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::Static.
 
 =cut

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3001';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -44,12 +44,98 @@ $VERSION = '0.3001';
 
 use CGI::WPM::Base 0.31;
 @ISA = qw(CGI::WPM::Base);
+use CGI::EventCountFile 1.01;
 
 ######################################################################
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+	require CGI::WPM::Globals;
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+
+	if( $globals->user_input_param( 'debugging' ) eq 'on' ) {
+		$globals->is_debug( 1 );  # let us keep separate logs when debugging
+	}
+
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send reports to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send reports here
+
+	require CGI::WPM::Usage;
+	$globals->move_current_srp( $globals->is_debug() ? 'usage_debug' : 'usage' );
+	$globals->move_site_prefs( '../usage_prefs.pl' );  # configuration file
+	CGI::WPM::Usage->execute( $globals );  # do all the work
+	$globals->restore_site_prefs();
+	$globals->restore_last_srp();
+
+	$globals->send_to_user();  # send output
+
+=head2 Content of Configuration File "usage_prefs.pl"
+
+	my $rh_preferences = { 
+		email_logs => 1,  # do we want to be sent daily reports?
+		fn_dcm => 'date_counts_mailed.txt',  # our lock file to track mailings
+		mailing => [  # keep different types of reports in own emails
+			{
+				filenames => 'env.txt',
+				subject_unique => ' -- usage (env) to ',
+			}, {
+				filenames => 'site_vrp.txt',
+				subject_unique => ' -- usage (page views) to ',
+			}, {
+				filenames => 'redirect_urls.txt',
+				subject_unique => ' -- usage (external) to ',
+			}, {
+				filenames => [qw(
+					ref_urls.txt ref_se_urls.txt 
+					ref_se_keywords.txt ref_discards.txt
+				)],
+				subject_unique => ' -- usage (references) to ',
+				erase_files => 1,  # start over listing each day
+			},
+		],
+		env => {  # what misc info do we want to know (low value distrib)
+			filename => 'env.txt',
+			var_list => [qw(
+				DOCUMENT_ROOT GATEWAY_INTERFACE HTTP_CONNECTION HTTP_HOST
+				REQUEST_METHOD SCRIPT_FILENAME SCRIPT_NAME SERVER_ADMIN 
+				SERVER_NAME SERVER_PORT SERVER_PROTOCOL SERVER_SOFTWARE
+			)],
+		},
+		site => {  # which pages on our own site are viewed?
+			filename => 'site_vrp.txt',
+		},
+		redirect => {  # which of our external links are followed?
+			filename => 'redirect_urls.txt',
+		},
+		referrer => {  # what sites are referring to us?
+			filename => 'ref_urls.txt',   # normal websites go here
+			fn_search => 'ref_se_urls.txt',  # search engines go here
+			fn_keywords => 'ref_se_keywords.txt',  # their keywords go here
+			fn_discards => 'ref_discards.txt',  # uris we filter out
+			site_urls => [qw(  # which urls we want to count as self-reference
+				http://www.sampleweb.net
+				http://sampleweb.net
+				http://www.sampleweb.net/default.pl
+				http://sampleweb.net/default.pl
+				http://www.sampleweb.net:80
+				http://sampleweb.net:80
+				http://www.sampleweb.net:80/default.pl
+				http://sampleweb.net:80/default.pl
+			)],
+			discards => [qw(  # filter uri's we want to ignore
+				^(?!http://)
+				deja
+				mail
+			)],
+			use_def_engines => 1,  # use info on some engines that class holds
+			search_engines => {  # match domain with query param holding keywords
+				superfind => 'query',
+				getitnow => 'qt',
+				'gimme.com' => 'iwant',
+			},
+		},
+	};
 
 =head1 DESCRIPTION
 
@@ -68,17 +154,8 @@ the POD for that module so you know how to call this one.
 
 =head1 PREFERENCES HANDLED BY THIS MODULE
 
-I<This POD is coming when I get the time to write it.>
-
-	wpm_module  # wpm module making content
-	wpm_subdir  # subdir holding wpm support files
-	wpm_prefs   # prefs hash/fn we give to wpm mod
-	log_usage   # true if we should log usage
-	usg_subdir  # subdir holding usg support files
-	usg_sub_dg  # subdir for usg logs when debugging
-	usg_prefs   # prefs hash/fn that this usg mod can use
-
-I<Contents of usg_prefs are all optional, and will be documented later.>
+I<This POD is coming when I get the time to write it.  Meanwhile, the 
+Synopsis uses the most important ones.  Most of them are optional.>
 
 =cut
 
@@ -88,54 +165,50 @@ I<Contents of usg_prefs are all optional, and will be documented later.>
 my $KEY_SITE_GLOBALS = 'site_globals';  # hold global site values
 
 # Keys for items in site page preferences:
-my $PKEY_WPM_MODULE = 'wpm_module'; # wpm module making content
-my $PKEY_WPM_SUBDIR = 'wpm_subdir'; # subdir holding wpm support files
-my $PKEY_WPM_PREFS  = 'wpm_prefs';  # prefs hash/fn we give to wpm mod
-my $PKEY_LOG_USAGE  = 'log_usage';  # true if we should log usage
-my $PKEY_USG_SUBDIR = 'usg_subdir'; # subdir holding usg support files
-my $PKEY_USG_SUB_DG = 'usg_sub_dg'; # subdir for usg logs when debugging
-my $PKEY_USG_PREFS  = 'usg_prefs';  # prefs hash/fn this usg mod can use
 
-# Keys for items in $PKEY_USG_PREFS preference:
+my $PKEY_TOKEN_TOTAL = 'token_total'; # token counts number of file updates
+my $PKEY_TOKEN_NIL   = 'token_nil'; # token counts number of '' values
+my $PKEY_EMAIL_LOGS  = 'email_logs'; # true if logs get emailed
+my $PKEY_FN_DCM      = 'fn_dcm';  # filename for "date counts mailed" record
+my $PKEY_MAILING     = 'mailing';  # array of hashes
+my $PKEY_LOG_ENV      = 'env'; # misc env variables go in here
+	# Generally only ENVs with a low distribution of values go here.
+my $PKEY_LOG_SITE     = 'site'; # pages within this site (vrp) go in here
+my $PKEY_LOG_REDIRECT = 'redirect'; # urls we redirect to go in here
+my $PKEY_LOG_REFERRER  = 'referrer'; # urls that refer to us go in here
+	# note that urls for common search engines are stored separately 
+	# from those that aren't
 
-my $UKEY_ENV_MISC   = 'env_misc'; # name misc env variables to watch
-my $UKEY_SITE_URLS = 'site_urls'; # list urls site is, no qs
+# Keys for elements in $PKEY_MAILING hash:
+my $MKEY_FILENAMES      = 'filenames'; # list of filenames to include in mailing
+my $MKEY_ERASE_FILES    = 'erase_files'; # if true, then erase files afterwards
+my $MKEY_SUBJECT_UNIQUE = 'subject_unique'; # unique part of e-mail subject
+	# this text would go following site title and before today's date in subject
+
+# Keys in common for $KEY_LOG_* hashes:
+my $LKEY_FILENAME = 'filename';
+
+# Keys used only in $KEY_LOG_ENV hash:
+my $EKEY_VAR_LIST = 'var_list'; # name misc env variables to watch
+
+# Keys used only in $KEY_LOG_SITE hash:
+my $SKEY_TOKEN_REDIRECT = 'token_redirect';
+
+# Keys used only in $KEY_LOG_REFERRER hash:
+my $RKEY_FN_SEARCH       = 'fn_search'; # urls for ref common search engines
+	# note that search engine query strings are removed here, go next
+my $RKEY_FN_KEYWORDS     = 'fn_keywords'; # keywords used in sea eng ref url
+	# note that only se are counted, normal site kw kept with their urls
+my $RKEY_FN_DISCARDS     = 'fn_discards'; # urls such as news:// go only here
+my $RKEY_TOKEN_REF_SELF  = 'token_ref_self'; # indicates referer was same site
+my $RKEY_TOKEN_REF_OTHER = 'token_ref_other'; # ref not self but in other file
+my $RKEY_SITE_URLS       = 'site_urls'; # list urls site is, no qs
 	# This is useful, for example, to treat 'www' or prefixless versions 
 	# of this site's url as being one and the same.  Include 'http://'.
 	# Don't worry about case, as urls are automatically lowercased.
-my $UKEY_SEUL_SEKW  = 'seul_sekw'; # search engines and keyword param names
-my $UKEY_REF_JUNK   = 'ref_junk'; # if ref url matches these, filter junk
-
-# These are names of files we store usage data in.
-my $UKEY_FN_DCM      = 'fn_dcm'; # filename for "date counts mailed" record
-my $UKEY_FN_ENV_MISC = 'fn_env_misc'; # misc env variables go in here
-	# Generally only ENVs with a low distribution of values go here.
-my $UKEY_FN_SITE_VRP = 'fn_site_vrp'; # virtual resource paths go in here
-my $UKEY_FN_RED_URLS = 'fn_red_urls'; # urls we redirect to go in here
-my $UKEY_FN_REF_URLS = 'fn_ref_urls'; # urls that refer to us go in here
-	# note that urls for common search engines are omitted here, go next
-	# remaining urls keep their query strings, for now
-my $UKEY_FN_REF_SEUL = 'fn_ref_seul'; # urls for ref common search engines
-	# note that search engine query strings are removed here, go next
-my $UKEY_FN_REF_SEKW = 'fn_ref_sekw'; # keywords used in sea eng ref url
-	# note that only se are counted, normal site kw kept with their urls
-my $UKEY_FN_REF_JUNK = 'fn_ref_junk'; # urls such as news:// go only here
-	# note that once each day's worth is delivered, it gets wiped
-#my $UKEY_FN_REF_ISNW = 'fn_ref_isnw'; # if called by isindex query, kw
-
-# These tokens are stored in the count files as extra "events", which 
-# happen to be totals of something or other.  TOTAL is incremented with 
-# every page hit.  NIL is used when the event is an empty string. 
-# During any hit, a single one of the REF tokens is incremented as it 
-# best fits the referring url.  REF tokens are stored in every REF file 
-# that they complement, such that between the normal file values and the 
-# REFs and NIL, the counts all add up to TOTAL.
-my $UKEY_T_TOTAL    = 't_total';    # token counts number of file updates
-my $UKEY_T_NIL      = 't_nil';      # token counts number of '' values
-my $UKEY_T_REF_SELF = 't_ref_self'; # indicates referer was same site
-my $UKEY_T_REF_URLS = 't_ref_urls'; # referer was a normal,non-se site
-my $UKEY_T_REF_SEUL = 't_ref_seul'; # referer was a search engine
-my $UKEY_T_REF_JUNK = 't_ref_junk'; # someone read their e-mail/news in wb
+my $RKEY_DISCARDS        = 'discards'; # if ref url matches these, filter junk
+my $RKEY_SEARCH_ENGINES  = 'search_engines'; # search engines and kw param names
+my $RKEY_USE_DEF_ENGINES = 'use_def_engines'; # if true, use our own se list
 
 # Constant values used in this class go here:
 
@@ -144,9 +217,11 @@ my $UKEY_T_REF_JUNK = 't_ref_junk'; # someone read their e-mail/news in wb
 # They are all lowercased here for simplicity.  It's not complete, but I 
 # learned these engines because they linked to my web sites.
 my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
+	alltheweb => 'query', #
 	altavista => 'q',     # Altavista
 	'aj.com' => 'ask',    # Ask Jeeves
 	aol => 'query',       # America Online
+	'c4.com' => 'searchtext', #
 	'cs.com' => 'sterm',  # CompuServe
 	dmoz => 'search',     # Mozilla Open Directory
 	dogpile => 'q',       # DogPile
@@ -156,20 +231,16 @@ my %DEF_SEARCH_ENGINE_TERMS = (  # match keys against domains proper only
 	looksmart => 'key',   # LookSmart
 	lycos => 'query',     # Lycos
 	mamma => 'query',     # "Mother of Search Engines"
+	metacrawler => 'general', # MetaCrawler
 	msn => ['q','mt'],    # Microsoft
 	nbci => 'keyword',    # NBCi
 	netscape => 'search', # Netscape
 	ninemsn => 'q',       # nine msn
+	northernlight => 'qr', # Northern Light Search
 	'search.com' => 'q',  # CNET
 	snap => 'keyword',    # Microsoft
 	webcrawler => 'search', # Webcrawler
 	yahoo => 'p',         # Yahoo
-);
-
-# if referring url contains these anywhere, it goes in ref junk
-# start with anything not beginning with "http://"
-my @DEF_JUNK = qw(
-	^(?!http://)
 );
 
 ######################################################################
@@ -180,246 +251,188 @@ sub _dispatch_by_user {
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 	my $rh_prefs = $globals->site_prefs();
 
-	$rh_prefs->{$PKEY_WPM_PREFS} ||= {};
-	$rh_prefs->{$PKEY_USG_SUB_DG} ||= 'usage_debug'; # diff than usage
-	$rh_prefs->{$PKEY_USG_PREFS} ||= {};
+	$rh_prefs->{$PKEY_TOKEN_TOTAL} ||= '__total__';
+	$rh_prefs->{$PKEY_TOKEN_NIL} ||= '__nil__';
 
-	if( defined( $rh_prefs->{$PKEY_WPM_MODULE} ) ) {
-		$self->get_inner_wpm_content();  # puts in webpage of $globals
-	} else {   # we're only being a hit counter, and nothing else
-		# do nothing, page already initted to nothing
-	}
-
-	unless( $globals->site_pref( $PKEY_LOG_USAGE ) ) {
-		return( 1 );  # our work here is done if no logs to keep
-	}
+	$self->email_and_reset_counts_if_new_day();
 	
-	eval { require CGI::EventCountFile; };
-	if( $@ ) { 
-		$globals->add_error( "can't use module 'CGI::EventCountFile': $@\n" );
-		return( 0 );
-	}
-
-	$globals->move_current_srp( $globals->is_debug() ? 
-		$rh_prefs->{$PKEY_USG_SUB_DG} : $rh_prefs->{$PKEY_USG_SUBDIR} );
-	$globals->move_site_prefs( $rh_prefs->{$PKEY_USG_PREFS} );
-
-	$self->set_default_usage_prefs();
-
-	$self->mail_me_and_reset_counts_if_new_day();
+	$self->update_env_counts();
+	$self->update_site_vrp_counts();
+	$self->update_redirect_counts();
+	$self->update_referrer_counts();
 	
-	$self->update_site_usage_counts();
-
 	# Note that we don't presently print hit counts to the webpage.
 	# But that'll likely be added later, along with web usage reports.
-
-	$globals->restore_site_prefs();
-	$globals->restore_last_srp();
 }
 
 ######################################################################
 
-sub get_inner_wpm_content {
+sub email_and_reset_counts_if_new_day {
 	my $self = shift( @_ );
 	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $wpm_prefs = $globals->site_prefs();
+	my $rh_prefs = $globals->site_prefs();
 
-	my $wpm_mod_name = $wpm_prefs->{$PKEY_WPM_MODULE};
-
-	$globals->move_current_srp( $wpm_prefs->{$PKEY_WPM_SUBDIR} );
-	$globals->move_site_prefs( $wpm_prefs->{$PKEY_WPM_PREFS} );
-
-	eval {
-		# "require $wpm_mod_name;" yields can't find module in @INC error
-		eval "require $wpm_mod_name;"; if( $@ ) { die $@; }
-
-		unless( $wpm_mod_name->isa( 'CGI::WPM::Base' ) ) {
-			die "Error: $wpm_mod_name isn't a subclass of ".
-				"CGI::WPM::Base, so I don't know how to use it\n";
-		}
-
-		my $wpm = $wpm_mod_name->new( $globals );
-
-		$wpm->dispatch_by_user();
-		
-		$wpm->finalize();
-	};
-
-	$globals->restore_site_prefs();
-	$globals->restore_last_srp();
-
-	if( $@ ) {
-		$globals->add_error( "can't use module '$wpm_mod_name': $@\n" );
-
-		$globals->title( 'Error Getting Page' );
-
-		$globals->body_content( <<__endquote );
-<H2 ALIGN="center">@{[$globals->title()]}</H2>
-
-<P>I'm sorry, but an error occurred while getting the requested
-page.  We were unable to use the module that was supposed to 
-generate the page content, named "$wpm_mod_name".</P>
-
-@{[$self->_get_amendment_message()]}
-
-<P>$@</P>
-__endquote
-	}
-}
-
-######################################################################
-
-sub set_default_usage_prefs {
-	my $self = shift( @_ );
-	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $usg_prefs = $globals->site_pref( $PKEY_USG_PREFS );
-
-	$usg_prefs->{$UKEY_ENV_MISC} ||= [qw(
-		DOCUMENT_ROOT GATEWAY_INTERFACE HTTP_CONNECTION HTTP_HOST
-		REQUEST_METHOD SCRIPT_FILENAME SCRIPT_NAME SERVER_ADMIN 
-		SERVER_NAME SERVER_PORT SERVER_PROTOCOL SERVER_SOFTWARE
-	)];
-	ref( $usg_prefs->{$UKEY_ENV_MISC} ) eq 'ARRAY' or 
-		$usg_prefs->{$UKEY_ENV_MISC} = [$usg_prefs->{$UKEY_ENV_MISC}];
-
-	$usg_prefs->{$UKEY_SITE_URLS} ||= [];
-	ref( $usg_prefs->{$UKEY_SITE_URLS} ) eq 'ARRAY' or 
-		$usg_prefs->{$UKEY_SITE_URLS} = [$usg_prefs->{$UKEY_SITE_URLS}];
-	unshift( @{$usg_prefs->{$UKEY_SITE_URLS}}, $globals->base_url() );
-
-	$usg_prefs->{$UKEY_SEUL_SEKW} = {
-		%DEF_SEARCH_ENGINE_TERMS,
-		ref( $usg_prefs->{$UKEY_SEUL_SEKW} ) eq 'HASH' ? 
-			%{$usg_prefs->{$UKEY_SEUL_SEKW}} : (),
-	};
-	
-	$usg_prefs->{$UKEY_REF_JUNK} = [
-		@DEF_JUNK,
-		ref( $usg_prefs->{$UKEY_REF_JUNK} ) eq 'ARRAY' ? 
-			@{$usg_prefs->{$UKEY_REF_JUNK}} : (),
-	];
-	
-	$usg_prefs->{$UKEY_FN_DCM} ||= 'date_counts_mailed.txt';
-	$usg_prefs->{$UKEY_FN_ENV_MISC} ||= 'env.txt';
-	$usg_prefs->{$UKEY_FN_SITE_VRP} ||= 'site_vrp.txt';
-	$usg_prefs->{$UKEY_FN_RED_URLS} ||= 'redirect_urls.txt';
-	$usg_prefs->{$UKEY_FN_REF_URLS} ||= 'ref_urls.txt';
-	$usg_prefs->{$UKEY_FN_REF_SEUL} ||= 'ref_se_urls.txt';
-	$usg_prefs->{$UKEY_FN_REF_SEKW} ||= 'ref_se_keywords.txt';
-	$usg_prefs->{$UKEY_FN_REF_JUNK} ||= 'ref_junk.txt';
-
-	$usg_prefs->{$UKEY_T_TOTAL} ||= '__total__';
-	$usg_prefs->{$UKEY_T_NIL} ||= '__nil__';
-	$usg_prefs->{$UKEY_T_REF_SELF} ||= '__self_reference__';
-	$usg_prefs->{$UKEY_T_REF_URLS} ||= '__normal_website_ref__';
-	$usg_prefs->{$UKEY_T_REF_SEUL} ||= '__search_engine_ref__';
-	$usg_prefs->{$UKEY_T_REF_JUNK} ||= '__email_or_news_ref__';
-}
-
-######################################################################
-
-sub mail_me_and_reset_counts_if_new_day {
-	my $self = shift( @_ );
-	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $usg_prefs = $globals->site_pref( $PKEY_USG_PREFS );
+	$rh_prefs->{$PKEY_EMAIL_LOGS} or return( 1 );
 
 	$globals->add_no_error();
 	my $dcm_file = CGI::EventCountFile->new( 
-		$globals->phys_filename_string( $usg_prefs->{$UKEY_FN_DCM} ), 1 );
+		$globals->phys_filename_string( $rh_prefs->{$PKEY_FN_DCM} ), 1 );
 	$dcm_file->open_and_lock( 1 ) or do {
 		$globals->add_error( $dcm_file->is_error() );
 		return( 0 );
 	};
 	$dcm_file->read_all_records();
 	if( $dcm_file->key_was_incremented_today( 
-			$usg_prefs->{$UKEY_T_TOTAL} ) ) {
+			$rh_prefs->{$PKEY_TOKEN_TOTAL} ) ) {
 		$dcm_file->unlock_and_close();
 		return( 1 );
 	}
-	$dcm_file->key_increment( $usg_prefs->{$UKEY_T_TOTAL} );
+	$dcm_file->key_increment( $rh_prefs->{$PKEY_TOKEN_TOTAL} );
 	$dcm_file->write_all_records();
 	$dcm_file->unlock_and_close();
 
-	my @mail_body = ();
+	my $ra_mail_prefs = $rh_prefs->{$PKEY_MAILING};
+	ref( $ra_mail_prefs ) eq 'ARRAY' or $ra_mail_prefs = [$ra_mail_prefs];
 
-	my @fns_aggregate = map { $usg_prefs->{$_} } 
-		($UKEY_FN_ENV_MISC, $UKEY_FN_SITE_VRP, $UKEY_FN_RED_URLS, 
-		$UKEY_FN_REF_URLS, $UKEY_FN_REF_SEUL, $UKEY_FN_REF_SEKW);
+	foreach my $rh_mail_pref (@{$ra_mail_prefs}) {
+		ref( $rh_mail_pref ) eq 'HASH' or next;
 
-	foreach my $filename (@fns_aggregate) {
-		my $count_file = CGI::EventCountFile->new( 
-			$globals->phys_filename_string( $filename ), 1 );
-		$count_file->open_and_lock( 1 ) or do {
-			push( @mail_body, "\n\n".$count_file->is_error()."\n" );
-			next;
-		};
-		$count_file->read_all_records();
-		push( @mail_body, "\n\ncontent of '$filename':\n\n" );
-		push( @mail_body, $count_file->get_sorted_file_content() );
-		$count_file->set_all_day_counts_to_zero();
-		$count_file->write_all_records();
-		$count_file->unlock_and_close();
-	}
+		my $ra_filenames = $rh_mail_pref->{$MKEY_FILENAMES} || [];
+		ref( $ra_filenames ) eq 'ARRAY' or $ra_filenames = [$ra_filenames];
+		my $erase_files = $rh_mail_pref->{$MKEY_ERASE_FILES};
 
-	my @fns_clear_daily = map { $usg_prefs->{$_} } ($UKEY_FN_REF_JUNK);
+		my @mail_body = ();
 
-	foreach my $filename (@fns_clear_daily) {
-		my $count_file = CGI::EventCountFile->new( 
-			$globals->phys_filename_string( $filename ), 1 );
-		$count_file->open_and_lock( 1 ) or do {
-			push( @mail_body, "\n\n".$count_file->is_error()."\n" );
-			next;
-		};
-		$count_file->read_all_records();
-		push( @mail_body, "\n\ncontent of '$filename':\n\n" );
-		push( @mail_body, $count_file->get_sorted_file_content() );
-		$count_file->delete_all_keys();
-		$count_file->write_all_records();
-		$count_file->unlock_and_close();
-	}
+		foreach my $filename (@{$ra_filenames}) {
+			$filename or next;
+			my $count_file = CGI::EventCountFile->new( 
+				$globals->phys_filename_string( $filename ), 1 );
+			$count_file->open_and_lock( 1 ) or do {
+				push( @mail_body, "\n\n".$count_file->is_error()."\n" );
+				next;
+			};
+			$count_file->read_all_records();
+			push( @mail_body, "\n\ncontent of '$filename':\n\n" );
+			push( @mail_body, $count_file->get_sorted_file_content() );
+			if( $erase_files ) {
+				$count_file->delete_all_keys();
+			} else {
+				$count_file->set_all_day_counts_to_zero();
+			}
+			$count_file->write_all_records();
+			$count_file->unlock_and_close();
+		}
 
-	my ($today_str) = ($globals->today_date_utc() =~ m/^(\S+)/ );
+		my ($today_str) = ($globals->today_date_utc() =~ m/^(\S+)/ );
+		my $subject_unique = $rh_mail_pref->{$MKEY_SUBJECT_UNIQUE};
+		defined( $subject_unique) or $subject_unique = ' -- usage to ';
 
-	my $err_msg = $globals->send_email_message(
-		$globals->site_owner_name(),
-		$globals->site_owner_email(),
-		$globals->site_owner_name(),
-		$globals->site_owner_email(),
-		$globals->site_title()." -- Usage to $today_str",
-		join( '', @mail_body ),
-		<<__endquote,
+		my $err_msg = $globals->send_email_message(
+			$globals->site_owner_name(),
+			$globals->site_owner_email(),
+			$globals->site_owner_name(),
+			$globals->site_owner_email(),
+			$globals->site_title().$subject_unique.$today_str,
+			join( '', @mail_body ),
+			<<__endquote,
 This is a daily copy of the site usage count logs.
 The first visitor activity on $today_str has just occurred.
 __endquote
-	);
+		);
 
-	if( $err_msg ) {
-		$globals->add_error( "can't e-mail usage counts: $err_msg" );
+		if( $err_msg ) {
+			$globals->add_error( "can't e-mail usage counts: $err_msg" );
+		}
 	}
 }
 
 ######################################################################
 
-sub update_site_usage_counts {
+sub update_env_counts {
 	my $self = shift( @_ );
 	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $usg_prefs = $globals->site_pref( $PKEY_USG_PREFS );
+	my $rh_prefs = $globals->site_prefs();
+	
+	my $rh_log_prefs = $rh_prefs->{$PKEY_LOG_ENV};
+	ref( $rh_log_prefs ) eq 'HASH' or return( 0 );
+	
+	my $filename = $rh_log_prefs->{$LKEY_FILENAME} or return( 0 );
+	my $ra_var_list = $rh_log_prefs->{$EKEY_VAR_LIST};
+	ref( $ra_var_list ) eq 'ARRAY' or $ra_var_list = [$ra_var_list];
 	
 	# save miscellaneous low-distribution environment vars
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_ENV_MISC}, 
-		(map { "\$ENV{$_} = \"$ENV{$_}\"" } 
-		@{$usg_prefs->{$UKEY_ENV_MISC}}) );
+	$self->update_one_count_file( $filename, 
+		(map { "\$ENV{$_} = \"$ENV{$_}\"" } @{$ra_var_list}) );
+}
+
+######################################################################
+
+sub update_site_vrp_counts {
+	my $self = shift( @_ );
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+	my $rh_prefs = $globals->site_prefs();
+	
+	my $rh_log_prefs = $rh_prefs->{$PKEY_LOG_SITE};
+	ref( $rh_log_prefs ) eq 'HASH' or return( 0 );
+	
+	my $filename = $rh_log_prefs->{$LKEY_FILENAME} or return( 0 );
+	my $t_rd = $rh_log_prefs->{$SKEY_TOKEN_REDIRECT} || '__external_url__';
 	
 	# save which page within this site was hit
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_SITE_VRP}, 
-		lc( $globals->user_vrp_string() ) );
+	$self->update_one_count_file( $filename, 
+		lc( $globals->user_vrp_string() ), 
+		$globals->redirect_url() ? $t_rd : () );
+}
+
+######################################################################
+
+sub update_redirect_counts {
+	my $self = shift( @_ );
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+	my $rh_prefs = $globals->site_prefs();
+	
+	my $rh_log_prefs = $rh_prefs->{$PKEY_LOG_REDIRECT};
+	ref( $rh_log_prefs ) eq 'HASH' or return( 0 );
+	
+	my $filename = $rh_log_prefs->{$LKEY_FILENAME} or return( 0 );
 	
 	# save which url this site referred the visitor to, if any
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_RED_URLS}, 
-		lc( $globals->redirect_url() ) );
+	$self->update_one_count_file( $filename, lc( $globals->redirect_url() ) );
+}
+
+######################################################################
+
+sub update_referrer_counts {
+	my $self = shift( @_ );
+	my $globals = $self->{$KEY_SITE_GLOBALS};
+	my $rh_prefs = $globals->site_prefs();
+	
+	my $rh_log_prefs = $rh_prefs->{$PKEY_LOG_REFERRER};
+	ref( $rh_log_prefs ) eq 'HASH' or return( 0 );
+	
+	my $fn_normal = $rh_log_prefs->{$LKEY_FILENAME};
+	my $fn_search = $rh_log_prefs->{$RKEY_FN_SEARCH};
+	my $fn_keywords = $rh_log_prefs->{$RKEY_FN_KEYWORDS};
+	my $fn_discards = $rh_log_prefs->{$RKEY_FN_DISCARDS};
+	
+	my $t_rfs = $rh_log_prefs->{$RKEY_TOKEN_REF_SELF} || '__self_reference__';
+	my $t_rfo = $rh_log_prefs->{$RKEY_TOKEN_REF_OTHER} || '__other_reference__';
+	
+	my $ra_site_urls = $rh_log_prefs->{$RKEY_SITE_URLS} || [];
+	ref( $ra_site_urls ) eq 'ARRAY' or $ra_site_urls = [$ra_site_urls];
+	unshift( @{$ra_site_urls}, $globals->base_url() );
+	
+	my $ra_discards = $rh_log_prefs->{$RKEY_DISCARDS} || [];
+	ref( $ra_discards ) eq 'ARRAY' or $ra_discards = [$ra_discards];
+	
+	my $rh_engines = $rh_log_prefs->{$RKEY_SEARCH_ENGINES} || {};
+	ref( $rh_engines ) eq 'HASH' or $rh_engines = ();
+	if( $rh_log_prefs->{$RKEY_USE_DEF_ENGINES} ) {
+		%{$rh_engines} = (%DEF_SEARCH_ENGINE_TERMS, %{$rh_engines});
+	}
 	
 	# save which url had referred visitors to this site
-	my (@ref_urls, @ref_seul, @ref_sekw, @ref_junk);
+	my (@ref_norm, @ref_sear, @ref_keyw, @ref_disc);
 
 	SWITCH: {
 		my $referer = lc( $globals->http_referer() );
@@ -431,34 +444,34 @@ sub update_site_usage_counts {
 		my ($domain, $path) = ($1, $2);
 		
 		# first check if visitor is moving within our own site
-		foreach my $synonym (@{$usg_prefs->{$UKEY_SITE_URLS}}) {
+		foreach my $synonym (@{$ra_site_urls}) {
 			if( $ref_filename eq lc($synonym) ) {
-				push( @ref_urls, $usg_prefs->{$UKEY_T_REF_SELF} );
-				push( @ref_seul, $usg_prefs->{$UKEY_T_REF_SELF} );
-				push( @ref_sekw, $usg_prefs->{$UKEY_T_REF_SELF} );
-				push( @ref_junk, $usg_prefs->{$UKEY_T_REF_SELF} );
+				push( @ref_norm, $t_rfs );
+				push( @ref_sear, $t_rfs );
+				push( @ref_keyw, $t_rfs );
+				push( @ref_disc, $t_rfs );			
 				last SWITCH;
 			}
 		}
 
 		# else check if visitor came from checking an e-mail online
-		foreach my $ident (@{$usg_prefs->{$UKEY_REF_JUNK}}) {
+		foreach my $ident (@{$ra_discards}) {
 			if( $ref_filename =~ m|$ident| ) {
-				push( @ref_urls, $usg_prefs->{$UKEY_T_REF_JUNK} );
-				push( @ref_seul, $usg_prefs->{$UKEY_T_REF_JUNK} );
-				push( @ref_sekw, $usg_prefs->{$UKEY_T_REF_JUNK} );
-				push( @ref_junk, $referer );
+				push( @ref_norm, $t_rfo );
+				push( @ref_sear, $t_rfo );
+				push( @ref_keyw, $t_rfo );
+				push( @ref_disc, $referer );
 				last SWITCH;
 			}
 		}
 		
 		# else check if the referring domain is a search engine
-		foreach my $dom_frag (keys %{$usg_prefs->{$UKEY_SEUL_SEKW}}) {
+		foreach my $dom_frag (keys %{$rh_engines}) {
 			if( ".$domain." =~ m|[/\.]$dom_frag\.| ) {
 				my $se_query = CGI::HashOfArrays->new( 1, $query );
 				my @se_keywords;
 				
-				my $kwpn = $usg_prefs->{$UKEY_SEUL_SEKW}->{$dom_frag};
+				my $kwpn = $rh_engines->{$dom_frag};
 				my @kwpn = ref($kwpn) eq 'ARRAY' ? @{$kwpn} : $kwpn;
 				foreach my $query_param (@kwpn) {
 					push( @se_keywords, split( /\s+/, 
@@ -471,29 +484,25 @@ sub update_site_usage_counts {
 				}
 
 				# save both the file name and the search words used
-				push( @ref_urls, $usg_prefs->{$UKEY_T_REF_SEUL} );
-				push( @ref_seul, $ref_filename );
-				push( @ref_sekw, @se_keywords );
-				push( @ref_junk, $usg_prefs->{$UKEY_T_REF_SEUL} );
+				push( @ref_norm, $t_rfo );
+				push( @ref_sear, $ref_filename );
+				push( @ref_keyw, @se_keywords );
+				push( @ref_disc, $t_rfo );
 				last SWITCH;
 			}
 		}
 
 		# otherwise, referer is probably a normal web site
-		push( @ref_urls, $referer );
-		push( @ref_seul, $usg_prefs->{$UKEY_T_REF_URLS} );
-		push( @ref_sekw, $usg_prefs->{$UKEY_T_REF_URLS} );
-		push( @ref_junk, $usg_prefs->{$UKEY_T_REF_URLS} );
+		push( @ref_norm, $referer );
+		push( @ref_sear, $t_rfo );
+		push( @ref_keyw, $t_rfo );
+		push( @ref_disc, $t_rfo );
 	}
-	
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_REF_URLS}, 
-		@ref_urls );
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_REF_SEUL}, 
-		@ref_seul );
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_REF_SEKW}, 
-		@ref_sekw );
-	$self->update_one_count_file( $usg_prefs->{$UKEY_FN_REF_JUNK}, 
-		@ref_junk );
+
+	$fn_normal and $self->update_one_count_file( $fn_normal, @ref_norm );
+	$fn_search and $self->update_one_count_file( $fn_search, @ref_sear );
+	$fn_keywords and $self->update_one_count_file( $fn_keywords, @ref_keyw );
+	$fn_discards and $self->update_one_count_file( $fn_discards, @ref_disc );
 }
 
 ######################################################################
@@ -501,9 +510,9 @@ sub update_site_usage_counts {
 sub update_one_count_file {
 	my ($self, $filename, @keys_to_inc) = @_;
 	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $usg_prefs = $globals->site_pref( $PKEY_USG_PREFS );
+	my $rh_prefs = $globals->site_prefs();
 
-	push( @keys_to_inc, $usg_prefs->{$UKEY_T_TOTAL} );
+	push( @keys_to_inc, $rh_prefs->{$PKEY_TOKEN_TOTAL} );
 
 	my $count_file = CGI::EventCountFile->new( 
 		$globals->phys_filename_string( $filename ), 1 );
@@ -511,7 +520,7 @@ sub update_one_count_file {
 	$count_file->read_all_records();
 
 	foreach my $key (@keys_to_inc) {
-		$key eq '' and $key = $usg_prefs->{$UKEY_T_NIL};
+		$key eq '' and $key = $rh_prefs->{$PKEY_TOKEN_NIL};
 		$count_file->key_increment( $key );
 	}
 
@@ -541,6 +550,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::EventCountFile.
 
 =cut

@@ -1,0 +1,13 @@
+ChangeLog.txt
+Manifest.txt
+ReadMe.txt
+ToDo.txt
+lib/CGI/WPM/Base.pm
+lib/CGI/WPM/Globals.pm
+lib/CGI/WPM/GuestBook.pm
+lib/CGI/WPM/MailForm.pm
+lib/CGI/WPM/MultiPage.pm
+lib/CGI/WPM/Redirect.pm
+lib/CGI/WPM/SegTextDoc.pm
+lib/CGI/WPM/Static.pm
+lib/CGI/WPM/Usage.pm

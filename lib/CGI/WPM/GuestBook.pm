@@ -19,7 +19,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -54,7 +54,100 @@ use CGI::SequentialFile 1.0;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 Shortest Complete GuestBook Program -- Uses Default Question
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
+	);
+
+	require CGI::WPM::Globals;
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # msgs in here
+	
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
+
+	require CGI::WPM::GuestBook;
+	$globals->move_site_prefs( \%CONFIG );
+	CGI::WPM::GuestBook->execute( $globals );
+
+	$globals->send_to_user();
+
+=head2 Use Custom Questions Defined Here
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
+		custom_fd => 1,
+		field_defn => [
+			{
+				visible_title => "What's your age?",
+				type => 'textfield',
+				name => 'name',
+				is_required => 1,
+				validation_rule => '\d',
+				error_message => 'You must enter a number.',
+			}, {
+				visible_title => "What's the combination?",
+				type => 'checkbox_group',
+				name => 'words',
+				'values' => ['eenie', 'meenie', 'minie', 'moe'],
+				default => ['eenie', 'minie'],
+				labels => [qw( This That And Another )],
+			}, {
+				visible_title => "Who do you love?",
+				type => 'textfield',
+				name => 'name',
+			}, {
+				visible_title => "What's your favorite colour?",
+				type => 'popup_menu',
+				name => 'color',
+				'values' => ['red', 'green', 'blue', 'chartreuse'],
+			},
+		],
+	);
+
+=head2 Use Custom Questions Defined In Perl File
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
+		custom_fd => 1,
+		field_defn => 'guestbook_questions.txt',  # do Perl code to make array ref
+	);
+
+=head2 Use Custom Questions Defined In SequentialFile File
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
+		custom_fd => 1,
+		field_defn => 'guestbook_questions.txt',  # file in SequentialFile format
+		fd_in_seqf => 1,
+	);
+
+=head2 Customize Subject Of Your Emails
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',
+		email_subj => 'Your Visitor Has Left A Message',
+	);
+
+=head2 Customize Webpage Intro Text
+
+	my %CONFIG = (
+		fn_messages => 'guestbook_messages.txt',
+		msg_new_title => 'Leave A Message',  # custom title for new messages
+		msg_new_head => <<__endquote,   # custom heading for new messages
+	<H1>Leave A Message</H1>
+	<P>Please leave a message after the beep.  Answer the questions as faithfully
+	and truthfully as you can, as we have a lie detector set up and any false 
+	answers will be met with spam.</P>
+	__endquote
+		msg_list_title => 'Previous Reflections',  # custom title when reading
+		msg_list_head => <<__endquote,   # custom heading for reading
+	<H1>Wise Words That You Never Wrote</H1>
+	<P>Here are the messages that previous visitors wrote.  Please stay awhile 
+	and soak in the goodness.  You never know what you don't read.</P>
+	__endquote
+	);
 
 =head1 DESCRIPTION
 
@@ -629,6 +722,7 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, HTML::FormMaker, CGI::HashOfArrays, 
+CGI::SequentialFile.
 
 =cut

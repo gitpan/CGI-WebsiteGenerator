@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -48,11 +48,31 @@ use CGI::WPM::Base 0.3;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 Redirect To A Custom Url
+
+	require CGI::WPM::Globals;
+	my $globals = CGI::WPM::Globals->new();
+	
+	require CGI::WPM::Redirect;
+	$globals->move_site_prefs( {} );  # looks at query parameter "url"
+	CGI::WPM::Redirect->execute( $globals );
+	
+	$globals->send_to_user();  # sends a 301 Moved header
+
+=head2 Always Redirect To Same Url
+
+	$globals->move_site_prefs( {url => 'http://www.samplesitenew.net'} );
 
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+This module sets the redirect_url() property of the WebUserIO object that 
+Globals inherits from, and the latter does the actual work; you could do this 
+directly if you wished.  This Redirect module will spit out an ordinary HTML 
+page if it doesn't know what url to forward to.  It is intended to be used in 
+larger web sites that want to track outgoing visitors with the same program 
+that makes the site's pages.
 
 =head1 SYNTAX
 
@@ -137,6 +157,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WebUserIO.
 
 =cut

@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.31';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -36,26 +36,170 @@ $VERSION = '0.31';
 
 =head2 Nonstandard Modules
 
-	CGI::WebUserInput 0.91
-	CGI::WebUserOutput 0.91
+	CGI::WebUserIO 0.92
+	HTML::PageMaker 1.0
 
 =cut
 
 ######################################################################
 
-use CGI::WebUserInput 0.91;
-use CGI::WebUserOutput 0.91;
-@ISA = qw( CGI::WebUserInput CGI::WebUserOutput );
+use CGI::WebUserIO 0.92;
+use HTML::PageMaker 1.0;
+@ISA = qw( CGI::WebUserIO HTML::PageMaker );
 
 ######################################################################
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 Complete Example Of A Main Program
+
+	#!/usr/bin/perl
+	use strict;
+	use lib '/path/to/extra/perl/modules';
+
+	require CGI::WPM::Globals;  # to hold our input, output, preferences
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+
+	if( $globals->user_input_param( 'debugging' ) eq 'on' ) {  # when owner's here
+		$globals->is_debug( 1 );  # let us keep separate logs when debugging
+		$globals->persistant_user_input_param( 'debugging', 1 );  # remember...
+	}
+
+	$globals->user_vrp( lc( $globals->user_input_param(  # fetch extra path info...
+		$globals->vrp_param_name( 'path' ) ) ) );  # to know what page user wants
+	$globals->current_user_vrp_level( 1 );  # get ready to examine start of vrp
+	
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
+	$globals->site_owner_email_vrp( '/mailme' );  # site page email form is on
+
+	require CGI::WPM::MultiPage;  # all content is made through here
+	$globals->move_current_srp( 'content' );  # subdir holding content files
+	$globals->move_site_prefs( 'content_prefs.pl' );  # configuration file
+	CGI::WPM::MultiPage->execute( $globals );  # do all the work
+	$globals->restore_site_prefs();  # rewind configuration context
+	$globals->restore_last_srp();  # rewind subdir context
+
+	require CGI::WPM::Usage;  # content is done, log usage though here
+	$globals->move_current_srp( $globals->is_debug() ? 'usage_debug' : 'usage' );
+	$globals->move_site_prefs( '../usage_prefs.pl' );  # configuration file
+	CGI::WPM::Usage->execute( $globals );
+	$globals->restore_site_prefs();
+	$globals->restore_last_srp();
+
+	if( $globals->is_debug() ) {
+		$globals->body_append( <<__endquote );
+	<P>Debugging is currently turned on.</P>  # give some user feedback
+	__endquote
+	}
+
+	$globals->add_later_replace( {  # do some token substitutions
+		__mailme_url__ => "__vrp_id__=/mailme",
+		__external_id__ => "__vrp_id__=/external&url",
+	} );
+
+	$globals->add_later_replace( {  # more token substitutions in static pages
+		__vrp_id__ => $globals->persistant_vrp_url(),
+	} );
+
+	$globals->send_to_user();  # send output now that everything's ready
+	
+	if( my @errs = $globals->get_errors() ) {  # log problems for check later
+		foreach my $i (0..$#errs) {
+			chomp( $errs[$i] );  # save on duplicate "\n"s
+			print STDERR "Globals->get_error($i): $errs[$i]\n";
+		}
+	}
+
+	1;
+
+=head2 The Configuration File "content_prefs.pl"
+
+	my $rh_preferences = { 
+		page_header => <<__endquote,
+	__endquote
+		page_footer => <<__endquote,
+	<P><EM>Sample Web Site was created and is maintained for personal use by 
+	<A HREF="__mailme_url__">Darren Duncan</A>.  All content and source code was 
+	created by me, unless otherwise stated.  Content that I did not create is 
+	used with permission from the creators, who are appropriately credited where 
+	it is used and in the <A HREF="__vrp_id__=/cited">Works Cited</A> section of 
+	this site.</EM></P>
+	__endquote
+		page_css_code => [
+			'BODY {background-color: white; background-image: none}'
+		],
+		page_replace => {
+			__graphics_directories__ => 'http://www.sampleweb.net/graphics_directories',
+			__graphics_webring__ => 'http://www.sampleweb.net/graphics_webring',
+		},
+		vrp_handlers => {
+			external => {
+				wpm_module => 'CGI::WPM::Redirect',
+				wpm_prefs => {},
+			},
+			frontdoor => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'frontdoor.html' },
+			},
+			intro => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'intro.html' },
+			},
+			whatsnew => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'whatsnew.html' },
+			},
+			timelines => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'timelines.html' },
+			},
+			indexes => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'indexes.html' },
+			},
+			cited => {
+				wpm_module => 'CGI::WPM::MultiPage',
+				wpm_subdir => 'cited',
+				wpm_prefs => 'cited_prefs.pl',
+			},
+			mailme => {
+				wpm_module => 'CGI::WPM::MailForm',
+				wpm_prefs => {},
+			},
+			guestbook => {
+				wpm_module => 'CGI::WPM::GuestBook',
+				wpm_prefs => {
+					custom_fd => 1,
+					field_defn => 'guestbook_questions.txt',
+					fd_in_seqf => 1,
+					fn_messages => 'guestbook_messages.txt',
+				},
+			},
+			links => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'links.html' },
+			},
+			webrings => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'webrings.html' },
+			},
+		},
+		def_handler => 'frontdoor',
+	};
 
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+Subdirectories are all relative, so having '' means the current directory, 
+'something' is a level down, '..' is a level up, '../another' is a level 
+sideways, 'one/more/time' is 3 levels down.  However, any relative subdir 
+beginning with '/' becomes absolute, where '/' corresponds to the site file 
+root.  You can not go to parents of the site root.  Those are physical 
+directories (site resource path), and the uri does not reflect them.  The uri 
+does, however, reflect uri changes (virtual resource path).  
 
 =head1 SYNTAX
 
@@ -75,6 +219,8 @@ I<This POD is coming when I get the time to write it.>
 	new([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
 	initialize([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
 	clone([ CLONE ]) -- POD for this available below
+	
+	send_content_to_user([ CONTENT ]) -- overrides CGI::WebUserIO's version
 
 	is_debug([ NEW_VALUE ])
 
@@ -214,8 +360,8 @@ sub new {
 sub initialize {
 	my ($self, $root, $delim, $prefs, $user_input) = @_;
 
-	$self->CGI::WebUserInput::initialize( $user_input );
-	$self->CGI::WebUserOutput::initialize();
+	$self->CGI::WebUserIO::initialize( $user_input );
+	$self->HTML::PageMaker::initialize();
 	
 	%{$self} = (
 		%{$self},
@@ -270,8 +416,8 @@ are not changed.
 sub clone {
 	my ($self, $clone, @args) = @_;
 	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
-	$clone = $self->CGI::WebUserInput::clone( $clone );
-	$clone = $self->CGI::WebUserOutput::clone( $clone );
+	$clone = $self->CGI::WebUserIO::clone( $clone );
+	$clone = $self->HTML::PageMaker::clone( $clone );
 	
 	$clone->{$KEY_IS_DEBUG} = $self->{$KEY_IS_DEBUG};
 
@@ -300,6 +446,16 @@ sub clone {
 	$clone->{$KEY_OWNER_EM_VRP} = $self->{$KEY_OWNER_EM_VRP};
 
 	return( $clone );
+}
+
+######################################################################
+# Override same-named method in CGI::WebUserIO to acknowledge that we 
+# now store the page content within ourself.
+
+sub send_content_to_user {
+	my ($self, $content) = @_;
+	defined( $content ) or $content = $self->content_as_string();
+	$self->SUPER::send_content_to_user( $content );
 }
 
 ######################################################################
@@ -809,8 +965,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), HTML::PageMaker, CGI::WebUserIO, CGI::WPM::Base.
 
 =cut
-
-

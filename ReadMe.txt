@@ -3,6 +3,148 @@
 
 by Darren Duncan <perl@DarrenDuncan.net>
 
+SYNOPSIS
+
+Complete Example Of A Main Program
+
+	#!/usr/bin/perl
+	use strict;
+	use lib '/path/to/extra/perl/modules';
+
+	require CGI::WPM::Globals;  # to hold our input, output, preferences
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+
+	if( $globals->user_input_param( 'debugging' ) eq 'on' ) {  # when owner's here
+		$globals->is_debug( 1 );  # let us keep separate logs when debugging
+		$globals->persistant_user_input_param( 'debugging', 1 );  # remember...
+	}
+
+	$globals->user_vrp( lc( $globals->user_input_param(  # fetch extra path info...
+		$globals->vrp_param_name( 'path' ) ) ) );  # to know what page user wants
+	$globals->current_user_vrp_level( 1 );  # get ready to examine start of vrp
+	
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
+	$globals->site_owner_email_vrp( '/mailme' );  # site page email form is on
+
+	require CGI::WPM::MultiPage;  # all content is made through here
+	$globals->move_current_srp( 'content' );  # subdir holding content files
+	$globals->move_site_prefs( 'content_prefs.pl' );  # configuration file
+	CGI::WPM::MultiPage->execute( $globals );  # do all the work
+	$globals->restore_site_prefs();  # rewind configuration context
+	$globals->restore_last_srp();  # rewind subdir context
+
+	require CGI::WPM::Usage;  # content is done, log usage though here
+	$globals->move_current_srp( $globals->is_debug() ? 'usage_debug' : 'usage' );
+	$globals->move_site_prefs( '../usage_prefs.pl' );  # configuration file
+	CGI::WPM::Usage->execute( $globals );
+	$globals->restore_site_prefs();
+	$globals->restore_last_srp();
+
+	if( $globals->is_debug() ) {
+		$globals->body_append( <<__endquote );
+	<P>Debugging is currently turned on.</P>  # give some user feedback
+	__endquote
+	}
+
+	$globals->add_later_replace( {  # do some token substitutions
+		__mailme_url__ => "__vrp_id__=/mailme",
+		__external_id__ => "__vrp_id__=/external&url",
+	} );
+
+	$globals->add_later_replace( {  # more token substitutions in static pages
+		__vrp_id__ => $globals->persistant_vrp_url(),
+	} );
+
+	$globals->send_to_user();  # send output now that everything's ready
+	
+	if( my @errs = $globals->get_errors() ) {  # log problems for check later
+		foreach my $i (0..$#errs) {
+			chomp( $errs[$i] );  # save on duplicate "\n"s
+			print STDERR "Globals->get_error($i): $errs[$i]\n";
+		}
+	}
+
+	1;
+
+The Configuration File "content_prefs.pl"
+
+	my $rh_preferences = { 
+		page_header => <<__endquote,
+	__endquote
+		page_footer => <<__endquote,
+	<P><EM>Sample Web Site was created and is maintained for personal use by 
+	<A HREF="__mailme_url__">Darren Duncan</A>.  All content and source code was 
+	created by me, unless otherwise stated.  Content that I did not create is 
+	used with permission from the creators, who are appropriately credited where 
+	it is used and in the <A HREF="__vrp_id__=/cited">Works Cited</A> section of 
+	this site.</EM></P>
+	__endquote
+		page_css_code => [
+			'BODY {background-color: white; background-image: none}'
+		],
+		page_replace => {
+			__graphics_directories__ => 'http://www.sampleweb.net/graphics_directories',
+			__graphics_webring__ => 'http://www.sampleweb.net/graphics_webring',
+		},
+		vrp_handlers => {
+			external => {
+				wpm_module => 'CGI::WPM::Redirect',
+				wpm_prefs => {},
+			},
+			frontdoor => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'frontdoor.html' },
+			},
+			intro => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'intro.html' },
+			},
+			whatsnew => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'whatsnew.html' },
+			},
+			timelines => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'timelines.html' },
+			},
+			indexes => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'indexes.html' },
+			},
+			cited => {
+				wpm_module => 'CGI::WPM::MultiPage',
+				wpm_subdir => 'cited',
+				wpm_prefs => 'cited_prefs.pl',
+			},
+			mailme => {
+				wpm_module => 'CGI::WPM::MailForm',
+				wpm_prefs => {},
+			},
+			guestbook => {
+				wpm_module => 'CGI::WPM::GuestBook',
+				wpm_prefs => {
+					custom_fd => 1,
+					field_defn => 'guestbook_questions.txt',
+					fd_in_seqf => 1,
+					fn_messages => 'guestbook_messages.txt',
+				},
+			},
+			links => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'links.html' },
+			},
+			webrings => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'webrings.html' },
+			},
+		},
+		def_handler => 'frontdoor',
+	};
+
+DESCRIPTION
+
 CGI-WebsiteGenerator is a collection of Perl 5 modules that were developed
 originally to implement (generate/compile) an unlimited number of unrelated
 dynamic web-sites at once.  The web sites can contain any combination of static
@@ -18,9 +160,18 @@ like what questions are asked in forms such as guestbooks, and log files for the
 likes of guest books or usage count data.  Modules are designed such that their
 behaviour is customized by giving them different data or "preferences", rather
 than by changing the values of hardcoded constants.  Everything is designed with
-an extensible architecture so third parties can add features to it.  My ultimate
+an extensible architecture so third parties can add features to it.  One ultimate
 goal is that website owners can update their sites using their web browsers over
 a user-friendly interface.
+
+The modules are compatible with the mod_perl environment in addition to the CGI
+environment.  This means that I have tested all of the modules in a production
+mod_perl environment (my web sites) and found that they function properly within
+the demands that I place on them.  Prior to release 0.32 my only test environment
+was CGI.  More to the point, you should be able to write programs to these 
+modules and run them unchanged on either a CGI or mod_perl system, as my modules 
+will worry about the differences.  Of course, you still have to meet the 
+"good programming style" that mod_perl requires on your own...
 
 To see living examples of these modules in use, check out my web sites at
 "http://www.DarrenDuncan.net" and "http://www.chronology.net".
@@ -48,12 +199,12 @@ included in your Perl distribution then you will need to obtain them from CPAN.
 The versions below were the newest as of April of 2000.  Some of these are
 optional, so take them as your needs require:
 
-CGI-FormGenerator-0.91.tar.gz:
+CGI-FormGenerator-0.92.tar.gz:
 	- by Darren Duncan <perl@DarrenDuncan.net>
 	- these modules are always used:
-		- CGI::WebUserInput 0.91
-		- CGI::WebUserOutput 0.91
 		- CGI::HashOfArrays 1.02
+		- CGI::WebUserIO 0.92
+		- HTML::PageMaker 1.0
 	- these modules are optionally used:
 		- HTML::TagMaker 1.01 (for anything except redirection headers and usage)
 		- HTML::FormMaker 1.01 (for making input forms and form reports)
@@ -129,68 +280,12 @@ HOW TO USE THE MODULES
 
 First of all, it is always a good idea to skim through the POD for any module in
 order to learn how to use it.  However, the POD for all the CGI::WPM::* modules
-is incomplete right now.  What they do have is Name and Dependencies, as well as
-a list of their methods and a list of the "preferences" they handle.  What they
-lack is Synopsis, Descriptions, Method and Preference descriptions.  These will
-be added when I have the time.
-
-Now, at this time I don't have an exhaustive tutorial saying how to use these
-modules, but I have included two sample "web sites" in the folder called "demos".
-
-You should be able to install the folder anywhere on your web server, and only
-need to modify a single file in each one to make that site operational, and that 
-file is in the root of each web site folder, default.pl.
-
-The "website" folder includes a complete site with static pages, email forms, 
-guest books, and usage tracking both for page hits, incoming, and outgoing 
-visitors.  The "redirector" folder only does usage counting, and issues a 
-redirection page; it is intended for sites that have changed addresses so you 
-can figure out which other sites still have to fix their links.  In the future 
-I will put up more demos, for example, a guestbook-only site.  But you can 
-easily derive such from the "website" folder if you desire.  Of course, the 
-number of distinct guest books you can have in a single site is unlimited.
-
-The file "default.pl" is the "main program" which calls everything else.  This
-file needs to correspond to a web url on your server in order for a web browser
-to see it, although it can be run from the command shell.  All of the other files
-can be outside the public html directory.  What I do is keep all of the site
-files together, and put only a link/alias/shortcut to default.pl in my public web
-directory.
-
-Following is a portion of the "default.pl" file:
-
-	use lib '/users/me/www_files/lib';  # this is optional
-
-	require CGI::WPM::Globals;
-	require CGI::WPM::Base;
-
-	my $globals = CGI::WPM::Globals->new();
-
-	if( $globals->user_input_param( 'debugging' ) eq 'on' ) {
-		$globals->is_debug( 1 );
-		$globals->persistant_user_input_param( 'debugging', 1 );
-	}
-
-	$globals->site_root_dir( '/users/me/www_files/demos/website' );
-	$globals->system_path_delimiter( '/' );
-
-	$globals->user_vrp( lc( $globals->user_input_param( 
-		$globals->vrp_param_name( 'path' ) ) ) );
-	$globals->current_user_vrp_level( 1 );
-	
-	$globals->site_title( 'Sample Website By WPM' );
-	$globals->site_owner_name( 'John Sample' );
-	$globals->site_owner_email( 'john@sample.net' );
-	$globals->site_owner_email_vrp( '/mailme' );  # opt web page within the site
-
-You need to modify your copy of "default.pl" such that the information above is
-correct for your server's layout and operating system.  Not all of the function 
-calls are required; for example, the last block usually just applies to e-mail.
-
-All else I can suggest to figure things out is examine the files in the "demo"
-folder side-by-side with exploring the generated web site in your browser, and
-see what affect changing certain things has.  The demo site makes use of all the
-distribution modules in some way or other, but a real site doesn't have to.
+is incomplete right now.  What they do have is Name, Synopsis, and Dependencies, 
+as well as a list of their methods and a list of the "preferences" they handle.  
+What they lack is Descriptions, Method and Preference descriptions.  These will
+be added when I have the time.  Second of all, try looking at the source code 
+for the modules when in doubt.  At some point I will include a demo site with 
+this distribution, but for now the Synopsis code "should" run.
 
 FEATURES
 
@@ -284,12 +379,10 @@ made settings, nonexistant files, or non-compiling plug-in modules.  For better
 or worse, the program currently gives details on exactly what went wrong, so that
 the owner who is testing it has an easy time fixing it.
 
-* The modules are designed to be compatible with mod_perl, but I haven't tested
-this possibility yet; I will soon.  I say this because I avoid using global
-variables and I pass all subroutine parameters, and I don't use "main" at all. 
-All file-scoped variables are initialized at compile time (of that file), but
-some keys in my hashes may not be (they're optional), so hopefully that doesn't
-cause problems with the "initialize everything" rule.
+* The modules are compatible with the mod_perl environment in addition to the CGI
+environment.  This means that I have tested all of the modules in a production
+mod_perl environment (my web sites) and found that they function properly within
+the demands that I place on them.
 
 SUPPORT
 

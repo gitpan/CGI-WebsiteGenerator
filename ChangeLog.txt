@@ -1,3 +1,42 @@
+2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.32.
+	
+	* Added complete Synopsis POD to all the modules, as well as a few notes in 
+	the Description, and also added modules to See Also.  All modules have been 
+	increased in version to 0.32.  For most modules there were no code changes.  
+	But there should now be enough help that you can actually start *using* 
+	these things.  I deeply regret not having this documentation earlier.  The 
+	ReadMe file also has a copy of the Synopsis from CGI::WPM::Globals.
+		
+	* The other main purpose of this release is to ensure compatability with 
+	the mod_perl environment in addition to the CGI environment.  This means 
+	that I have tested all of the modules in a production mod_perl environment 
+	(my web sites) and found that they function properly within the demands that 
+	I place on them.  Previously my only test environment was CGI.
+	
+	* Updated CGI::WPM::Globals to stay compatible with changes to the 
+	CGI::FormMaker 0.92 distribution.  It's own public interface is unchanged.
+
+	* Added many new features to CGI::WPM::Usage, mostly in the areas of 
+	customizability, and therefore the public interface is completely different.  
+	Among the changes: 
+	- A poor design feature that allowed Usage to take the preferences for other 
+	  WPM modules and call them in turn, such as how MultiPage does, no longer 
+	  exists.  Your main program should instead call the other WPM modules and 
+	  then Usage afterwards, with the same Globals object.
+	- You can now choose which subset of transaction details should be tracked, 
+	  rather than being forced to use all-or-none as before.
+	- You can now choose which subset of transaction details that are logged 
+	  should be e-mailed to you on a max-daily basis.  In addition, the 
+	  information can be divided into multiple e-mails instead of all-in-one.  
+	  This also means that you can keep count logs without any e-mails at all.
+	  Log files in each mail group can optionally be cleared each day or not.
+	- Other, smaller customizations, particularly with referrer categorizing.
+	
+	* I removed the demo website, which was horribly out of date.  One such as 
+	it will return later.
+	
 2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.31.

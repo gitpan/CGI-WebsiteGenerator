@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3001';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -50,11 +50,181 @@ use CGI::WPM::Base 0.31;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+	require CGI::WPM::Globals;  # to hold our input, output, preferences
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+
+	$globals->user_vrp( lc( $globals->user_input_param(  # fetch extra path info...
+		$globals->vrp_param_name( 'path' ) ) ) );  # to know what page user wants
+	$globals->current_user_vrp_level( 1 );  # get ready to examine start of vrp
+	
+	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
+	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
+	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
+	$globals->site_owner_email_vrp( '/mailme' );  # site page email form is on
+
+	require CGI::WPM::MultiPage;  # all content is made through here
+	$globals->move_current_srp( 'content' );  # subdir holding content files
+	$globals->move_site_prefs( 'content_prefs.pl' );  # configuration file
+	CGI::WPM::MultiPage->execute( $globals );  # do all the work
+	$globals->restore_site_prefs();  # rewind configuration context
+	$globals->restore_last_srp();  # rewind subdir context
+
+	$globals->add_later_replace( {  # do some token substitutions
+		__mailme_url__ => "__vrp_id__=/mailme",
+		__external_id__ => "__vrp_id__=/external&url",
+	} );
+
+	$globals->add_later_replace( {  # more token substitutions in static pages
+		__vrp_id__ => $globals->persistant_vrp_url(),
+	} );
+
+	$globals->send_to_user();  # send output page now that everything's ready
+
+=head2 The Configuration File "content_prefs.pl"
+
+	my $rh_preferences = { 
+		page_header => <<__endquote,
+	__endquote
+		page_footer => <<__endquote,
+	<P><EM>Sample Web Site was created and is maintained for personal use by 
+	<A HREF="__mailme_url__">Darren Duncan</A>.  All content and source code was 
+	created by me, unless otherwise stated.  Content that I did not create is 
+	used with permission from the creators, who are appropriately credited where 
+	it is used and in the <A HREF="__vrp_id__=/cited">Works Cited</A> section of 
+	this site.</EM></P>
+	__endquote
+		page_css_code => [
+			'BODY {background-color: white; background-image: none}'
+		],
+		page_replace => {
+			__graphics_directories__ => 'http://www.sampleweb.net/graphics_directories',
+			__graphics_webring__ => 'http://www.sampleweb.net/graphics_webring',
+		},
+		vrp_handlers => {
+			external => {
+				wpm_module => 'CGI::WPM::Redirect',
+				wpm_prefs => {},
+			},
+			frontdoor => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'frontdoor.html' },
+			},
+			intro => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'intro.html' },
+			},
+			whatsnew => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'whatsnew.html' },
+			},
+			timelines => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'timelines.html' },
+			},
+			indexes => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'indexes.html' },
+			},
+			cited => {
+				wpm_module => 'CGI::WPM::MultiPage',
+				wpm_subdir => 'cited',
+				wpm_prefs => 'cited_prefs.pl',
+			},
+			mailme => {
+				wpm_module => 'CGI::WPM::MailForm',
+				wpm_prefs => {},
+			},
+			guestbook => {
+				wpm_module => 'CGI::WPM::GuestBook',
+				wpm_prefs => {
+					custom_fd => 1,
+					field_defn => 'guestbook_questions.txt',
+					fd_in_seqf => 1,
+					fn_messages => 'guestbook_messages.txt',
+				},
+			},
+			links => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'links.html' },
+			},
+			webrings => {
+				wpm_module => 'CGI::WPM::Static',
+				wpm_prefs => { filename => 'webrings.html' },
+			},
+		},
+		def_handler => 'frontdoor',
+		menu_items => [
+			{
+				menu_name => 'Front Door',
+				menu_path => '',
+				is_active => 1,
+			}, {
+				menu_name => 'Welcome to SampleWeb',
+				menu_path => 'intro',
+				is_active => 1,
+			}, {
+				menu_name => "What's New",
+				menu_path => 'whatsnew',
+				is_active => 1,
+			}, 1, {
+				menu_name => 'Story Timelines',
+				menu_path => 'timelines',
+				is_active => 1,
+			}, {
+				menu_name => 'Issue Indexes',
+				menu_path => 'indexes',
+				is_active => 1,
+			}, {
+				menu_name => 'Works Cited',
+				menu_path => 'cited',
+				is_active => 1,
+			}, {
+				menu_name => 'Preview Database',
+				menu_path => 'dbprev',
+				is_active => 0,
+			}, 1, {
+				menu_name => 'Send Me E-mail',
+				menu_path => 'mailme',
+				is_active => 1,
+			}, {
+				menu_name => 'Guest Book',
+				menu_path => 'guestbook',
+				is_active => 1,
+			}, 1, {
+				menu_name => 'External Links',
+				menu_path => 'links',
+				is_active => 1,
+			}, {
+				menu_name => 'Webrings',
+				menu_path => 'webrings',
+				is_active => 1,
+			},
+		],
+		menu_cols => 4,
+	#	menu_colwid => 100,
+		menu_showdiv => 0,
+	#	menu_bgcolor => '#ddeeff',
+		page_showdiv => 1,
+	};
 
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+Generated page menus are entirely optional, so if you don't like the format 
+you can roll your own.  Due to advances in release 0.3, you can nest as many 
+levels of MultiPage as you wish, and they will work as you expect.  Each 
+"child" of MultiPage is called in the same means as if that page were the only 
+one in the whole program; each has its own handler WPM module, its own config 
+data, and optionally its own srp subdirectory.  
+
+Subdirectories are all relative, so having '' means the current directory, 
+'something' is a level down, '..' is a level up, '../another' is a level 
+sideways, 'one/more/time' is 3 levels down.  However, any relative subdir 
+beginning with '/' becomes absolute, where '/' corresponds to the site file 
+root.  You can not go to parents of the site root.  Those are physical 
+directories (site resource path), and the uri does not reflect them.  The uri 
+does, however, reflect uri changes (virtual resource path).  
 
 =head1 SYNTAX
 
@@ -363,6 +533,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals.
 
 =cut

@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.3';
+$VERSION = '0.32';
 
 ######################################################################
 
@@ -48,11 +48,29 @@ use CGI::WPM::Base 0.3;
 
 =head1 SYNOPSIS
 
-I<This POD is coming when I get the time to write it.>
+=head2 Display An HTML File
 
+	require CGI::WPM::Globals;
+	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );
+	
+	require CGI::WPM::Static;
+	$globals->move_site_prefs( {filename => 'intro.html'} );
+	CGI::WPM::Static->execute( $globals );  # content-type: text/html
+	
+	$globals->send_to_user();
+
+=head2 Display A Plain Text File -- HTML Escaped
+
+	$globals->move_site_prefs( {filename => 'mycode.txt', is_text => 1} );
+	
 =head1 DESCRIPTION
 
 I<This POD is coming when I get the time to write it.>
+
+Obviously, static files would be better served with a normal web server, but 
+this module addresses such a trivial case for when they are embedded in sites 
+with dynamic content, including when you want to embed plain text in HTML.
+Also, you can now do search-and-replace in the otherwise static text.
 
 =head1 SYNTAX
 
@@ -166,6 +184,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1).
+perl(1), CGI::WPM::Base, CGI::WPM::Globals.
 
 =cut
