@@ -3,145 +3,53 @@
 
 by Darren Duncan <perl@DarrenDuncan.net>
 
-SYNOPSIS
+CONTENTS
 
-Complete Example Of A Main Program
+* Preface
+* Manifest
+* Description
+* Keeping Up To Date
+* Requirements
+* Installation
+* Module List
+* How to Use the Modules
+* Features
+* Support
+* To Do
+* Program Example
+* Author
 
-	#!/usr/bin/perl
-	use strict;
-	use lib '/path/to/extra/perl/modules';
+PREFACE
 
-	require CGI::WPM::Globals;  # to hold our input, output, preferences
-	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # get input
+This distribution features 13 Perl 5 modules that all belong in the temporary 
+CGI::WPM::* namespace.  These modules are not officially registered, as they are 
+in a state of change.  As such they are subject to be renamed, some could be 
+split up and others combined.  However, they are perfectly usable as is.
 
-	if( $globals->user_input_param( 'debugging' ) eq 'on' ) {  # when owner's here
-		$globals->is_debug( 1 );  # let us keep separate logs when debugging
-		$globals->persistant_user_input_param( 'debugging', 1 );  # remember...
-	}
+All of my modules have complete POD inside of them, so please refer to that for a
+description of the modules themselves.  Look at CGI::WPM::Globals and 
+CGI::WPM::Base in particular because they are the core of the system.
 
-	$globals->user_vrp( lc( $globals->user_input_param(  # fetch extra path info...
-		$globals->vrp_param_name( 'path' ) ) ) );  # to know what page user wants
-	$globals->current_user_vrp_level( 1 );  # get ready to examine start of vrp
-	
-	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
-	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
-	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
-	$globals->site_owner_email_vrp( '/mailme' );  # site page email form is on
+This Read Me document concerns itself mainly with installation and support
+issues, and also includes any "To Do" lists and the file manifest.
 
-	require CGI::WPM::MultiPage;  # all content is made through here
-	$globals->move_current_srp( 'content' );  # subdir holding content files
-	$globals->move_site_prefs( 'content_prefs.pl' );  # configuration file
-	CGI::WPM::MultiPage->execute( $globals );  # do all the work
-	$globals->restore_site_prefs();  # rewind configuration context
-	$globals->restore_last_srp();  # rewind subdir context
+MANIFEST
 
-	require CGI::WPM::Usage;  # content is done, log usage though here
-	$globals->move_current_srp( $globals->is_debug() ? 'usage_debug' : 'usage' );
-	$globals->move_site_prefs( '../usage_prefs.pl' );  # configuration file
-	CGI::WPM::Usage->execute( $globals );
-	$globals->restore_site_prefs();
-	$globals->restore_last_srp();
-
-	if( $globals->is_debug() ) {
-		$globals->body_append( <<__endquote );
-	<P>Debugging is currently turned on.</P>  # give some user feedback
-	__endquote
-	}
-
-	$globals->add_later_replace( {  # do some token substitutions
-		__mailme_url__ => "__vrp_id__=/mailme",
-		__external_id__ => "__vrp_id__=/external&url",
-	} );
-
-	$globals->add_later_replace( {  # more token substitutions in static pages
-		__vrp_id__ => $globals->persistant_vrp_url(),
-	} );
-
-	$globals->send_to_user();  # send output now that everything's ready
-	
-	if( my @errs = $globals->get_errors() ) {  # log problems for check later
-		foreach my $i (0..$#errs) {
-			chomp( $errs[$i] );  # save on duplicate "\n"s
-			print STDERR "Globals->get_error($i): $errs[$i]\n";
-		}
-	}
-
-	1;
-
-The Configuration File "content_prefs.pl"
-
-	my $rh_preferences = { 
-		page_header => <<__endquote,
-	__endquote
-		page_footer => <<__endquote,
-	<P><EM>Sample Web Site was created and is maintained for personal use by 
-	<A HREF="__mailme_url__">Darren Duncan</A>.  All content and source code was 
-	created by me, unless otherwise stated.  Content that I did not create is 
-	used with permission from the creators, who are appropriately credited where 
-	it is used and in the <A HREF="__vrp_id__=/cited">Works Cited</A> section of 
-	this site.</EM></P>
-	__endquote
-		page_css_code => [
-			'BODY {background-color: white; background-image: none}'
-		],
-		page_replace => {
-			__graphics_directories__ => 'http://www.sampleweb.net/graphics_directories',
-			__graphics_webring__ => 'http://www.sampleweb.net/graphics_webring',
-		},
-		vrp_handlers => {
-			external => {
-				wpm_module => 'CGI::WPM::Redirect',
-				wpm_prefs => {},
-			},
-			frontdoor => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'frontdoor.html' },
-			},
-			intro => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'intro.html' },
-			},
-			whatsnew => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'whatsnew.html' },
-			},
-			timelines => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'timelines.html' },
-			},
-			indexes => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'indexes.html' },
-			},
-			cited => {
-				wpm_module => 'CGI::WPM::MultiPage',
-				wpm_subdir => 'cited',
-				wpm_prefs => 'cited_prefs.pl',
-			},
-			mailme => {
-				wpm_module => 'CGI::WPM::MailForm',
-				wpm_prefs => {},
-			},
-			guestbook => {
-				wpm_module => 'CGI::WPM::GuestBook',
-				wpm_prefs => {
-					custom_fd => 1,
-					field_defn => 'guestbook_questions.txt',
-					fd_in_seqf => 1,
-					fn_messages => 'guestbook_messages.txt',
-				},
-			},
-			links => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'links.html' },
-			},
-			webrings => {
-				wpm_module => 'CGI::WPM::Static',
-				wpm_prefs => { filename => 'webrings.html' },
-			},
-		},
-		def_handler => 'frontdoor',
-	};
+Base.pm
+ChangeLog
+EventCountFile.pm
+Globals.pm
+GuestBook.pm
+MailForm.pm
+MultiPage.pm
+PageMaker.pm
+ReadMe
+Redirect.pm
+SegTextDoc.pm
+SequentialFile.pm
+Static.pm
+Usage.pm
+WebUserIO.pm
 
 DESCRIPTION
 
@@ -178,7 +86,7 @@ To see living examples of these modules in use, check out my web sites at
 
 KEEPING UP TO DATE
 
-These modules are constantly under development.  You should be able to find the
+My module set is constantly under development.  You should be able to find the
 newest versions at my website, "http://www.DarrenDuncan.net", on the page called
 "Perl Libraries I Made" (name subject to change).  They can also be found on CPAN
 under the author name of "DUNCAND".  
@@ -192,54 +100,78 @@ changed.
 REQUIREMENTS
 
 All of my modules require Perl 5.004 or newer, even though only some of them need
-it, in the interest of consistency.
+it, in the interest of consistency.  Modules in this distribution require modules 
+in these following distributions:
 
-These third-party distributions are required by some of mine.  If they aren't
-included in your Perl distribution then you will need to obtain them from CPAN. 
-The versions below were the newest as of April of 2000.  Some of these are
-optional, so take them as your needs require:
+MultiValuedHash-1.03.tar.gz
+	- by Darren Duncan (DUNCAND)
+	- CGI::MultiValuedHash 1.03 is required by:
+		- CGI::WPM::WebUserIO (parsing user input)
+		- CGI::WPM::SequentialFile (for serializing file data)
+		- CGI::WPM::Globals (inherits WebUserIO)
+		- Anything that uses FormTemplate
 
-CGI-FormGenerator-0.92.tar.gz:
-	- by Darren Duncan <perl@DarrenDuncan.net>
-	- these modules are always used:
-		- CGI::HashOfArrays 1.02
-		- CGI::WebUserIO 0.92
-		- HTML::PageMaker 1.0
-	- these modules are optionally used:
-		- HTML::TagMaker 1.01 (for anything except redirection headers and usage)
-		- HTML::FormMaker 1.01 (for making input forms and form reports)
-		- CGI::SequentialFile 1.01 (for saving guest book messages in files; form
-definitions may optionally be stored in this type of file as well)
-		- CGI::EventCountFile 1.02 (for saving usage data in files)
+HTML-EasyTags-1.02.tar.gz
+	- by Darren Duncan (DUNCAND)
+	- HTML::EasyTags 1.02 is required by:
+		- CGI::WPM::PageMaker (when assembling a final HTML page only)
+		- Anything that uses PageMaker except when redirection headers and usage
 
-libnet-1.0703.tar.gz:
-	- by Graham Barr <gbarr@pobox.com>
-	- this module is optionally used:
-		- Net::SMTP 2.15 (for sending e-mails of form or usage data)
+HTML-FormTemplate-1.02.tar.gz
+	- by Darren Duncan (DUNCAND)
+	- HTML::FormTemplate 1.02 is required by:
+		- CGI::WPM::MailForm (for making input forms and form reports)
+		- CGI::WPM::GuestBook (for making input forms and form reports)
 
-Older versions of modules that I didn't make may work as well, but I haven't
-tried using them so do it at your own risk.
+libnet-1.0703.tar.gz (older versions may work):
+	- by Graham Barr (GBARR)
+	- Net::SMTP 2.15 is required by:
+		- CGI::WPM::Globals (when sending e-mails of form or usage data)
+		- Anything that uses Globals
+	
+libwww-perl-5.48.tar.gz (older versions may work):
+	- by Gisle Aas (GAAS)
+	- HTTP::Headers 1.37 is required by:
+		- CGI::WPM::WebUserIO (when outputting http headers to the user)
+		
+mod_perl-1.24_01.tar.gz (older versions may work):
+	- Apache 1.27 is required by:
+		- CGI::WPM::WebUserIO (when running under mod_perl)
 
 INSTALLATION
 
-I haven't gotten around to doing makefiles, so you will have to install these the
-old fashioned way, by copying.  
-
-Any files that you find in "lib" can go in their corresponding locations in the
-"lib" folder that came with your Perl 5 distribution.  Or alternately, put them
-anywhere you want, but you will need to have that location added to your include
-path by your main program using something like this:
+I haven't gotten around to doing makefiles, so you will have to install this the
+old fashioned way, by copying.  All of the ".pm" files in this distribution go 
+inside the temporary folder "WPM", which is inside "CGI", which is in the "lib" 
+folder that came with your Perl 5 distribution.  Or alternately, put it anywhere 
+you want, but you will need to have that location added to your include path by 
+your main program using something like this:
 
 	use lib '/users/me/www_files/lib';
 
-Any existing POD is embedded in the modules themselves, so you will have to look
-there to see it, or run a POD extractor on it yourself, or look at the copies on
-CPAN that are dutifully extracted and turned to HTML.
+Any existing POD is embedded in the module itself, so you will have to look there
+to see it, or run a POD extractor on it yourself, or look at the copy on CPAN
+that is dutifully extracted and turned to HTML.
 
 MODULE LIST
 
 Here is a quick list of all the modules in the distribution, and what each is
 for.
+
+CGI::WPM::PageMaker - Perl module that maintains and assembles the components of a 
+new HTML 4 page, with CSS, and also provides search and replace capabilities.
+
+CGI::WPM::WebUserIO - Perl module that gathers, parses, and manages user input and
+output data, including HTTP headers, query strings, posts, searches, cookies, and
+shell arguments, as well as providing cleaner access to many environment
+variables, consistantly under both CGI and mod_perl.
+
+CGI::WPM::SequentialFile - Perl module that interfaces to a common text file format
+which stores records as named and url-escaped key=value pairs.
+
+CGI::WPM::EventCountFile - Perl module that interfaces to a tab-delimited text file
+for storing date-bounded counts of occurances for multiple events, such as web
+page views.
 
 CGI::WPM::Globals - Perl module that is used by all subclasses of CGI::WPM::Base
 for managing global program settings, file system and web site hierarchy
@@ -390,9 +322,121 @@ Currently I don't have any support arranged with other people, lists, newsgroups
 or otherwise.  Feel free to ask me if you can't figure things out on your own, or
 another person whom you know has used this.
 
+TO DO
+
+	* Break the distribution up into several different ones, separating the 
+	generic functionality from the proprietary.  To date, 5 generic modules have 
+	already been split off into their own 4 distributions: Class-ParamParser, 
+	MultiValuedHash, HTML-EasyTags, HTML-FormTemplate.  Others will follow...
+
+PROGRAM EXAMPLE
+
+Note that this example only uses some of the lower level modules, and also uses 
+the HTML-FormTemplate distribution.  See the POD for CGI::WPM::Globals and 
+CGI::WPM::Base for examples of the use of my high level modules.
+
+	use HTML::FormTemplate;
+	use CGI::WPM::PageMaker;
+	use CGI::WPM::SequentialFile;
+	use CGI::WPM::WebUserIO;
+	
+	my @questions = (
+		{
+			visible_title => "What's your name?",
+			type => 'textfield',
+			name => 'name',
+			is_required => 1,
+			error_message => 'You must enter your name.',
+			exclude_in_echo => 1,
+		}, {
+			visible_title => "Your E-mail",
+			type => 'textfield',
+			name => 'email',
+			size => 30,
+			is_required => 1,
+			validation_rule => '\S\@\S',
+			help_message => 'E-mails are in the form "user@domain".',
+			error_message => 'You must enter your e-mail.',
+		}, {
+			visible_title => "What's the combination?",
+			type => 'checkbox_group',
+			name => 'words',
+			'values' => ['eenie', 'meenie', 'minie', 'moe'],
+			default => ['eenie', 'minie'],
+		}, {
+			visible_title => "What's your favorite colour?",
+			type => 'popup_menu',
+			name => 'color',
+			'values' => ['red', 'green', 'blue', 'chartreuse'],
+		}, {
+			type => 'submit', 
+		},
+	);
+	
+	my $webpage = CGI::WPM::PageMaker->new();
+	my $query = CGI::WPM::WebUserIO->new();
+	my $message_file = CGI::WPM::SequentialFile->new( "GB_Messages.txt", 1 );
+	my $form = HTML::FormTemplate->new();
+	
+	$form->form_submit_url( $query->self_url() );
+	$form->field_definitions( \@questions );
+	$form->user_input( $query->user_input() );
+	
+	if( $form->new_form() ) {  # if we're called first time
+		$webpage->title( 'Please sign the guest book' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->make_html_input_form( 1 )
+		);
+
+	} elsif( $form->validate_form_input() ) {  #if there were errors
+		$webpage->title( 'Please fix your mistakes' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->make_html_input_form( 1 )
+		);
+
+	} else {  # submitted answers are fine
+		$webpage->title( 'Here is what you signed with' );
+		$webpage->body_content(
+			$form->h1( $webpage->title() ),
+			$form->p( 'From: '.$query->user_input_param( 'name' ) ),
+			$form->make_html_input_echo( 1 )
+		);
+	}
+	
+	$message_file->append_new_records( $query->user_input() ) or 
+		$webpage->body_append( '<P>Unfortunately, there was an error in saving'.
+		' your message to the guest book: '.$message_file->is_error()."</P>\n" );
+	
+	$webpage->body_append( 
+		$form->hr(),
+		$form->h1( 'Existing Messages' )
+	);
+	
+	my @message_list = $message_file->fetch_all_records( 1 );
+	
+	if( my $err_msg = $message_file->is_error() ) {
+		$webpage->body_append( '<P>Unfortunately, there was an error reading'.
+		' the messages from the guest book: '.$err_msg."</P>\n" );
+
+	} else {  # show the existing messages
+		my @message_html = ();
+		foreach my $message (reverse @message_list) {
+			$form->user_input( $message );
+			my $name = $message->fetch_value( 'name' );
+			push( @message_html, "<H3>From $name:</H3>" );
+			push( @message_html, 
+				$form->make_html_input_echo( 1, 1, '(no answer)' ) );
+		}
+		$weboage->body_append( \@message_html );
+	}
+	
+	$query->send_to_user( undef, $webpage->content_as_string() );
+
 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. These modules are
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. These modules are
 free software; you can redistribute them and/or modify them under the same terms
 as Perl itself.  However, I do request that their copyright information remains
 attached to the files.  If you modify this module and redistribute a changed
@@ -403,6 +447,6 @@ module to use in any of your own code then please send me the URL.  Also, if you
 make modifications to the module because it doesn't work the way you need, please
 send me a copy so that I can roll desirable changes into the main release.
 
-Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
+Address comments, suggestions, and bug reports to perl@DarrenDuncan.net.
 
 Share and Enjoy!

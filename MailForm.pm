@@ -1,17 +1,16 @@
 =head1 NAME
 
-CGI::WPM::GuestBook - Perl module that is a subclass of CGI::WPM::Base and
-implements a complete guest book with unlimited questions that also e-mails 
-submissions to the website owner.
+CGI::WPM::MailForm - Perl module that is a subclass of CGI::WPM::Base and
+implements an e-mail submission form with unlimited questions.
 
 =cut
 
 ######################################################################
 
-package CGI::WPM::GuestBook;
+package CGI::WPM::MailForm;
 require 5.004;
 
-# Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+# Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 # free software; you can redistribute it and/or modify it under the same terms as
 # Perl itself.  However, I do request that this copyright information remain
 # attached to the file.  If you modify this module and redistribute a changed
@@ -19,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.32';
+$VERSION = '0.33';
 
 ######################################################################
 
@@ -35,68 +34,53 @@ $VERSION = '0.32';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.3
-	CGI::WPM::Globals 0.3
-	HTML::FormMaker 1.0
-	CGI::HashOfArrays 1.01
-	CGI::SequentialFile 1.0
+	CGI::WPM::Base 0.33
+	CGI::WPM::Globals 0.33
+	HTML::FormTemplate 1.02
+	CGI::MultiValuedHash 1.03
+	CGI::WPM::SequentialFile 1.03 (optional)
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.3;
+use CGI::WPM::Base 0.33;
 @ISA = qw(CGI::WPM::Base);
-use HTML::FormMaker 1.0;
-use CGI::SequentialFile 1.0;
+use HTML::FormTemplate 1.02;
 
 ######################################################################
 
 =head1 SYNOPSIS
 
-=head2 Shortest Complete GuestBook Program -- Uses Default Question
+=head2 Shortest Complete MailForm Program -- Uses Default Question
 
-	my %CONFIG = (
-		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
-	);
+	my %CONFIG = ();
 
 	require CGI::WPM::Globals;
-	my $globals = CGI::WPM::Globals->new( "/path/to/site/files" );  # msgs in here
+	my $globals = CGI::WPM::Globals->new();
 	
 	$globals->site_title( 'Sample Web Site' );  # use this in e-mail subjects
 	$globals->site_owner_name( 'Darren Duncan' );  # send messages to him
 	$globals->site_owner_email( 'darren@sampleweb.net' );  # send messages here
 
-	require CGI::WPM::GuestBook;
+	require CGI::WPM::MailForm;
 	$globals->move_site_prefs( \%CONFIG );
-	CGI::WPM::GuestBook->execute( $globals );
+	CGI::WPM::MailForm->execute( $globals );
 
 	$globals->send_to_user();
 
 =head2 Use Custom Questions Defined Here
 
 	my %CONFIG = (
-		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
 		custom_fd => 1,
 		field_defn => [
 			{
-				visible_title => "What's your age?",
-				type => 'textfield',
-				name => 'name',
-				is_required => 1,
-				validation_rule => '\d',
-				error_message => 'You must enter a number.',
-			}, {
 				visible_title => "What's the combination?",
 				type => 'checkbox_group',
 				name => 'words',
 				'values' => ['eenie', 'meenie', 'minie', 'moe'],
 				default => ['eenie', 'minie'],
 				labels => [qw( This That And Another )],
-			}, {
-				visible_title => "Who do you love?",
-				type => 'textfield',
-				name => 'name',
 			}, {
 				visible_title => "What's your favorite colour?",
 				type => 'popup_menu',
@@ -109,25 +93,22 @@ use CGI::SequentialFile 1.0;
 =head2 Use Custom Questions Defined In Perl File
 
 	my %CONFIG = (
-		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
 		custom_fd => 1,
-		field_defn => 'guestbook_questions.txt',  # do Perl code to make array ref
+		field_defn => 'survey_questions.txt',  # do Perl code to make array ref
 	);
 
 =head2 Use Custom Questions Defined In SequentialFile File
 
 	my %CONFIG = (
-		fn_messages => 'guestbook_messages.txt',  # file in SequentialFile format
 		custom_fd => 1,
-		field_defn => 'guestbook_questions.txt',  # file in SequentialFile format
+		field_defn => 'survey_questions.txt',  # file in SequentialFile format
 		fd_in_seqf => 1,
 	);
 
 =head2 Customize Subject Of Your Emails
 
 	my %CONFIG = (
-		fn_messages => 'guestbook_messages.txt',
-		email_subj => 'Your Visitor Has Left A Message',
+		email_subj => 'Another Survey Response',
 	);
 
 =head2 Customize Webpage Intro Text
@@ -141,12 +122,6 @@ use CGI::SequentialFile 1.0;
 	and truthfully as you can, as we have a lie detector set up and any false 
 	answers will be met with spam.</P>
 	__endquote
-		msg_list_title => 'Previous Reflections',  # custom title when reading
-		msg_list_head => <<__endquote,   # custom heading for reading
-	<H1>Wise Words That You Never Wrote</H1>
-	<P>Here are the messages that previous visitors wrote.  Please stay awhile 
-	and soak in the goodness.  You never know what you don't read.</P>
-	__endquote
 	);
 
 =head1 DESCRIPTION
@@ -156,8 +131,9 @@ I<This POD is coming when I get the time to write it.>
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions
-and B<$object-E<gt>method()> for methods.
+using object notation.  This means using B<Class-E<gt>function()> for functions
+and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
+your own modules, then that often means something like B<$self-E<gt>method()>. 
 
 =head1 PUBLIC FUNCTIONS AND METHODS
 
@@ -174,17 +150,12 @@ I<This POD is coming when I get the time to write it.>
 		# If array ref, this is taken literally as list of definitions.
 		# Otherwise, this is name of a file containing the definitions.
 	fd_in_seqf  # if true, above file is of the 
-		# format that CGI::SequentialFile handles; else it is Perl code
-
-	fn_messages  # file messages go in, if filed
+		# format that CGI::WPM::SequentialFile handles; else it is Perl code
 
 	email_subj  # if set, use when sending e-mails
 
 	msg_new_title  # custom title for new messages
 	msg_new_head   # custom heading for new messages
-
-	msg_list_title  # custom title when reading
-	msg_list_head   # custom heading for reading
 
 =cut
 
@@ -200,13 +171,10 @@ my $PKEY_FIELD_DEFN = 'field_defn';  # instruc for how to make form fields
 	# If array ref, this is taken literally as list of definitions.
 	# Otherwise, this is name of a file containing the definitions.
 my $PKEY_FD_IN_SEQF = 'fd_in_seqf';  # if true, above file is of the 
-	# format that CGI::SequentialFile handles; else it is Perl code
-my $PKEY_FN_MESSAGES = 'fn_messages';  # file messages go in, if filed
+	# format that CGI::WPM::SequentialFile handles; else it is Perl code
 my $PKEY_EMAIL_SUBJ = 'email_subj';  # if set, use when sending e-mails
 my $PKEY_MSG_NEW_TITLE = 'msg_new_title'; # custom title for new messages
 my $PKEY_MSG_NEW_HEAD  = 'msg_new_head'; # custom heading for new messages
-my $PKEY_MSG_LIST_TITLE = 'msg_list_title'; # custom title when reading
-my $PKEY_MSG_LIST_HEAD  = 'msg_list_head'; # custom heading for reading
 
 # Names of the fields in our html form:
 my $FFN_NAMEREAL = 'namereal';  # user's real name
@@ -224,14 +192,8 @@ my @DEF_FORM_QUESTIONS = ( {
 	error_message => 'You must enter a message.',
 } );
 
-# Extra fields in guest book log file
-my $LFN_SUBMIT_DATE   = 'submit_date';
-my $LFN_SUBMIT_DOMAIN = 'submit_domain';
-
 # Constant values used in this class go here:
 my $EMPTY_FIELD_ECHO_STRING = '(no answer)';
-my $VRP_SIGN = 'sign';  # in this sub path is the book signing page
-	# if no sub path is chosen, we view guest book by default
 
 ######################################################################
 # This is provided so CGI::WPM::Base->dispatch_by_user() can call it.
@@ -247,14 +209,9 @@ sub _dispatch_by_user {
 			last SWITCH;
 		}
 
-		my $form = HTML::FormMaker->new();
+		my $form = HTML::FormTemplate->new();
 		$form->form_submit_url( $globals->self_url() );
 		$form->field_definitions( $ra_field_defs );
-
-		unless( $globals->current_user_vrp_element() eq $VRP_SIGN ) {
-			$self->read_guest_book( $form );
-			last SWITCH;
-		}
 
 		$form->user_input( $globals->user_input() 
 			)->trim_bounding_whitespace();  # user_input() returns ref
@@ -271,9 +228,7 @@ sub _dispatch_by_user {
 		
 		$self->send_mail_to_me( $form ) or last SWITCH;
 		
-		$self->sign_guest_book( $form ) or last SWITCH;
-
-		$self->mail_me_and_sign_guest_ok( $form );
+		$self->mail_me_ok( $form );
 		
 		if( $globals->user_input_param( $FFN_WANTCOPY ) eq 'on' ) {
 			$self->send_mail_to_writer( $form );
@@ -321,7 +276,7 @@ sub get_field_definitions {
 	push( @field_definitions, 
 		{
 			type => 'submit', 
-			label => 'Post',
+			label => 'Send',
 		}, {
 			type => 'reset', 
 			label => 'Clear',
@@ -363,8 +318,14 @@ sub get_question_field_defs {
 		return( $ra_field_list );
 	}
 	
-	# we will now get questions using CGI::SequentialFile
-	my $field_defin_file = CGI::SequentialFile->new( $filepath );
+	# we will now get questions using CGI::WPM::SequentialFile
+	eval { require CGI::WPM::SequentialFile; };
+	if( $@ ) {
+		$globals->add_error( 
+			"can't open program module 'CGI::WPM::SequentialFile'" );
+		return( [] );
+	}
+	my $field_defin_file = CGI::WPM::SequentialFile->new( $filepath );
 	my $ra_field_list = $field_defin_file->fetch_all_records( 1 );
 	ref( $ra_field_list ) eq 'ARRAY' or $ra_field_list = [];
 	$globals->add_error( $field_defin_file->is_error() );
@@ -377,13 +338,13 @@ sub no_questions_error {
 	my $self = shift( @_ );
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
-	$globals->title( "Error Starting GuestBook" );
+	$globals->title( "Error Starting MailForm" );
 
 	$globals->body_content( <<__endquote );
 <H2 ALIGN="center">@{[$globals->title()]}</H2>
 
 <P>I'm sorry, but an error has occurred while trying to start 
-the Guest Book.  We are missing critical settings information 
+the Mail Form.  We are missing critical settings information 
 that is required to operate.  Specifically, we don't know what 
 questions we are supposed to ask you.  Here are some details about 
 what caused this problem:</P>
@@ -396,103 +357,21 @@ __endquote
 
 ######################################################################
 
-sub read_guest_book {
-	my ($self, $form) = @_;
-	my $globals = $self->{$KEY_SITE_GLOBALS};
-	my $sign_gb_url = $globals->persistant_vrp_url( $VRP_SIGN );
-
-	my $filename = $globals->site_pref( $PKEY_FN_MESSAGES );
-	my $filepath = $globals->phys_filename_string( $filename );
-	my $message_file = CGI::SequentialFile->new( $filepath, 1 );
-	my @message_list = $message_file->fetch_all_records( 1 );
-
-	if( my $err_msg = $message_file->is_error() ) {
-		$globals->add_error( $err_msg );
-	
-		$globals->title( "Error Reading GuestBook Postings" );
-
-		$globals->body_content( <<__endquote );
-<H2 ALIGN="center">@{[$globals->title()]}</H2>
-
-<P>I'm sorry, but an error has occurred while trying to read the 
-existing guest book messages from the log file, meaning that I can't 
-show you any.</P>
-
-<P>details: $err_msg</P>
-
-@{[$self->_get_amendment_message()]}
-__endquote
-
-		return( 0 );
-	}
-
-	unless( @message_list ) {
-		$globals->title( "Empty Guest Book" );
-
-		$globals->body_content( <<__endquote );
-<H2 ALIGN="center">@{[$globals->title()]}</H2>
-
-<P>The guest book currently has no messages in it, as either none 
-were successfully posted or they were deleted since then.  You can 
-still <A HREF="$sign_gb_url">sign</A> it yourself, however.</P>
-__endquote
-
-		return( 1 );
-	}
-
-	my @message_html = ();
-	
-	foreach my $message (reverse @message_list) {
-		$form->user_input( $message );
-		my $name_real = $message->fetch_value( $FFN_NAMEREAL );
-		my $submit_date = $message->fetch_value( $LFN_SUBMIT_DATE );
-		push( @message_html, "<H3>From $name_real at $submit_date:</H3>" );
-		push( @message_html, 
-			$form->make_html_input_echo( 1, 1, $EMPTY_FIELD_ECHO_STRING ) );
-		push( @message_html, "\n<HR>" );
-	}
-	pop( @message_html );  # get rid of trailing <HR>
-	
-	$globals->body_content( \@message_html );		
-	
-	$globals->body_prepend( <<__endquote );
-<P>You may also <A HREF="$sign_gb_url">sign</A> 
-this guest book yourself, if you wish.</P>
-__endquote
-	$globals->body_append( <<__endquote );
-<P>You may also <A HREF="$sign_gb_url">sign</A> 
-this guest book yourself, if you wish.</P>
-__endquote
-
-	$globals->title( $globals->site_pref( $PKEY_MSG_LIST_TITLE ) || 
-		"Guest Book Messages" );
-
-	$globals->body_prepend( 
-		$globals->site_pref( $PKEY_MSG_LIST_HEAD ) || <<__endquote );
-<H2 ALIGN="center">@{[$globals->title()]}</H2>
-
-<P>Messages are ordered from newest to oldest.  
-__endquote
-
-	return( 1 );
-}
-
-######################################################################
-
 sub new_message {
 	my ($self, $form) = @_;
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
 	$globals->title( $globals->site_pref( $PKEY_MSG_NEW_TITLE ) || 
-		"Sign the Guest Book" );
+		"Send Me An E-mail" );
 
 	$globals->body_content( 
 		$globals->site_pref( $PKEY_MSG_NEW_HEAD ) || <<__endquote );
 <H2 ALIGN="center">@{[$globals->title()]}</H2>
 
-<P>This form is provided as an easy way for you to give feedback 
-concerning this web site, and at the same time, let everyone else 
-know what you think.</P>
+<P>This form is provided as an easy way for you to send me a private 
+e-mail message, when you wish to contact me and/or give me your 
+thoughts on this site.  This is also a good forum to report any bugs 
+you have discovered, so I can fix them as soon as possible.</P>
 __endquote
 
 	$globals->body_append( <<__endquote );
@@ -518,8 +397,8 @@ sub invalid_input {
 	$globals->body_content( <<__endquote );
 <H2 ALIGN="center">@{[$globals->title()]}</H2>
 
-<P>Your submission could not be added to the guest book because some 
-of the fields were not correctly filled in, which are indicated with a 
+<P>Your message could not be sent because some of the fields were not
+correctly filled in, which are indicated with a 
 '@{[$form->bad_input_marker()]}'.  Fields with a 
 '@{[$form->required_field_marker()]}' are required and can not be left 
 empty.  Please make sure you have entered your name and e-mail address 
@@ -545,7 +424,7 @@ sub send_mail_to_me {
 		$globals->user_input_param( $FFN_NAMEREAL ),
 		$globals->user_input_param( $FFN_EMAIL ),
 		$globals->site_pref( $PKEY_EMAIL_SUBJ ) || 
-			$globals->site_title().' -- GuestBook Message',
+			$globals->site_title().' -- Private Mail Message',
 		$form->make_text_input_echo( 0, $EMPTY_FIELD_ECHO_STRING ),
 		<<__endquote.
 It is the result of a form submission from a site visitor, 
@@ -566,8 +445,7 @@ __endquote
 <H2 ALIGN="center">@{[$globals->title()]}</H2>
 
 <P>I'm sorry, but an error has occurred while trying to e-mail your 
-message to me.  It also hasn't been added to the guest book.  As a 
-result, no one will see it.</P>
+message to me.  As a result I will not see it.</P>
 
 <P>This problem can occur if you enter a nonexistant or unreachable 
 e-mail address into the e-mail field, in which case, please enter a 
@@ -593,63 +471,16 @@ __endquote
 
 ######################################################################
 
-sub sign_guest_book {
+sub mail_me_ok {
 	my ($self, $form) = @_;
 	my $globals = $self->{$KEY_SITE_GLOBALS};
 
-	my $new_posting = $globals->user_input()->clone();
-	$new_posting->store( $LFN_SUBMIT_DATE, $globals->today_date_utc() );
-	$new_posting->store( $LFN_SUBMIT_DOMAIN, 
-		$globals->remote_addr().':'.$globals->remote_host() );
-
-	my $filename = $globals->site_pref( $PKEY_FN_MESSAGES );
-	my $filepath = $globals->phys_filename_string( $filename );
-	my $message_file = CGI::SequentialFile->new( $filepath, 1 );
-	$message_file->append_new_records( $new_posting );
-
-	if( my $err_msg = $message_file->is_error() ) {
-		$globals->add_error( $err_msg );
-	
-		$globals->title( "Error Writing to Guest Book" );
-
-		$globals->body_content( <<__endquote );
-<H2 ALIGN="center">@{[$globals->title()]}</H2>
-
-<P>I'm sorry, but an error has occurred while trying to write your 
-message into the guest book.  As a result it will not appear when
-the guest book is viewed by others.  However, the message was
-e-mailed to me.</P>
-
-<P>details: $err_msg</P>
-
-@{[$self->_get_amendment_message()]}
-
-@{$form->make_html_input_form( 1, 1 )}
-
-<P>It may take from 1 to 30 seconds to process this form, so please be 
-patient and don't click Send multiple times.  A confirmation message 
-will appear if everything worked.</P>
-__endquote
-
-		return( 0 );
-	}
-	
-	return( 1 );
-}
-
-######################################################################
-
-sub mail_me_and_sign_guest_ok {
-	my ($self, $form) = @_;
-	my $globals = $self->{$KEY_SITE_GLOBALS};
-
-	$globals->title( "Your Message Has Been Added" );
+	$globals->title( "Your Message Has Been Sent" );
 
 	$globals->body_content( <<__endquote );
 <H2 ALIGN="center">@{[$globals->title()]}</H2>
 
-<P>Your message has been added to this guest book, and a copy was 
-e-mailed to me as well.  This is what the copy e-mailed to me said:</P>
+<P>This is what the message said:</P>
 
 <P><STRONG>To:</STRONG> 
 @{[$globals->site_owner_name()]}
@@ -658,7 +489,7 @@ e-mailed to me as well.  This is what the copy e-mailed to me said:</P>
 &lt;@{[$globals->user_input_param( $FFN_EMAIL )]}&gt;
 <BR><STRONG>Subject:</STRONG> 
 @{[$globals->site_pref( $PKEY_EMAIL_SUBJ ) || 
-	$globals->site_title().' -- GuestBook Message']}</P>
+	$globals->site_title().' -- Private Mail Message']}</P>
 
 @{[$form->make_html_input_echo( 1, 1, $EMPTY_FIELD_ECHO_STRING )]}
 __endquote
@@ -676,7 +507,7 @@ sub send_mail_to_writer {
 		$globals->site_owner_name(),
 		$globals->site_owner_email(),
 		$globals->site_pref( $PKEY_EMAIL_SUBJ ) || 
-			$globals->site_title().' -- GuestBook Message',
+			$globals->site_title().' -- Private Mail Message',
 		$form->make_text_input_echo( 0, $EMPTY_FIELD_ECHO_STRING ),
 		<<__endquote,
 It is the result of a form submission from a site visitor, 
@@ -707,7 +538,7 @@ __END__
 
 =head1 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.  However, I do request that this copyright information remain
 attached to the file.  If you modify this module and redistribute a changed
@@ -722,7 +553,7 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::Base, CGI::WPM::Globals, HTML::FormMaker, CGI::HashOfArrays, 
-CGI::SequentialFile.
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, HTML::FormTemplate, 
+CGI::MultiValuedHash, CGI::WPM::SequentialFile.
 
 =cut

@@ -1,3 +1,40 @@
+2001-01-05   Darren Duncan <perl@DarrenDuncan.net>
+
+	* Release 0.33.
+	
+	* As of this release, the separate CGI-FormGenerator distribution ceased to 
+	exist.  Its more generic modules were separated into their own distributions, 
+	and its more proprietary modules have been brought on board this distribution.
+	This essentially reversed the trend started when libdwg broke up.  
+	CGI-WebsiteGenerator now contains 13 modules, but is considered a temporary 
+	distribution, as more parts will be split off into general distributions 
+	later.
+	
+	* As of this release, the following 5 modules have been registered with 
+	"The Perl 5 Module List" (5th one pending results) as generic modules:
+		- Class::ParamParser 1.01 (was same name, v1.0)
+		- Data::MultiValuedHash 1.03, 
+		  CGI::MultiValuedHash 1.03 (were CGI::HashOfArrays 1.02)
+		- HTML::EasyTags 1.02 (was HTML::TagMaker 1.01)
+		- HTML::FormTemplate 1.02 (was HTML::FormMaker 1.01)
+		
+	* As of this release, the following 4 modules have joined this distribution, 
+	and also renamed into the CGI::WPM::* namespace (we now have 13 total):
+		- CGI::WPM::WebUserIO 0.93 (was CGI::WebUserIO 0.92)
+		- CGI::WPM::PageMaker 1.01 (was HTML::PageMaker 1.0)
+		- CGI::WPM::SequentialFile 1.03 (was CGI::SequentialFile 1.02)
+		- CGI::WPM::EventCountFile 1.04 (was CGI::EventCountFile 1.03)
+
+	* As of this release, all 9 of the preexisting modules had their version 
+	numbers increased by 0.01 to 0.33 to reflect small changes made to them to 
+	stay compatible with the renaming of above modules that they used.  
+	These modules' own public interface is unchanged.
+	
+	* The file structure in this distribution has changed, with all files in 
+	the root level and with the ToDo/Manifest rolled into the ReadMe.
+	
+	* No other changes were made.
+	
 2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.3201.
@@ -80,6 +117,9 @@
 	Also, CGI::WPM::Usage recognizes a few more urls as being search engines.
 	Both classes are now at version 0.3001 up from 0.3.
 
+	* CGI::EventCountFile ceased being its own distribution, and it joined with 
+	the CGI-FormGenerator distribution.
+
 2000-09-04   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Release 0.3.
@@ -111,6 +151,23 @@
 		- CGI-FormGenerator-0.9.tar.gz
 		- libnet-1.0703.tar.gz
 		- EventCountFile-1.0.tar.gz
+		
+	* The "CGI-FormGenerator" distribution was also split off from libdwg, and 
+	these were the modules in it:
+		HTML::TagMaker 1.0
+		HTML::FormMaker 1.0
+		CGI::HashOfArrays 1.01
+		CGI::SequentialFile 1.0
+		CGI::WebUserInput 0.9
+		CGI::WebUserOutput 0.9
+
+	* The "EventCountFile" distribution was also split off from libdwg, and 
+	this module was in it:
+		CGI::EventCountFile 1.01
+
+	* The "Class-ParamParser" distribution was also split off from libdwg, and 
+	this module was in it:
+		Class::ParamParser 1.0
 	
 2000-08-23   Darren Duncan <perl@DarrenDuncan.net>
 
@@ -127,7 +184,7 @@
 	* Completed primary development on these modules' code, but the POD is mostly
 non-existant.
 
-2000-04-14   Darren Duncan <perl@DarrenDuncan.net>
+2000-03-07   Darren Duncan <perl@DarrenDuncan.net>
 
 	* Began development on the final versions of these modules.
 	
@@ -151,4 +208,4 @@ CGI.pm.  This board is possibly still in use today in a corporate Intranet site.
 	forms and guest books with unlimited questions (but were text only), 
 	redirection, and usage tracking.  The implementation was 
 	just a hell of a lot uglier.  These modules also used CGI.pm to do the 
-	things that I now use my CGI-FormGenerator distribution to do instead.
+	things that I now use my HTML-FormTemplate distribution to do instead.

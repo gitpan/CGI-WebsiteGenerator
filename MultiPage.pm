@@ -12,7 +12,7 @@ components, and can make a navigation bar to child pages.
 package CGI::WPM::MultiPage;
 require 5.004;
 
-# Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+# Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 # free software; you can redistribute it and/or modify it under the same terms as
 # Perl itself.  However, I do request that this copyright information remain
 # attached to the file.  If you modify this module and redistribute a changed
@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.32';
+$VERSION = '0.33';
 
 ######################################################################
 
@@ -36,14 +36,14 @@ $VERSION = '0.32';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.31
-	CGI::WPM::Globals 0.3
+	CGI::WPM::Base 0.33
+	CGI::WPM::Globals 0.33
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.31;
+use CGI::WPM::Base 0.33;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
@@ -229,8 +229,9 @@ does, however, reflect uri changes (virtual resource path).
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions
-and B<$object-E<gt>method()> for methods.
+using object notation.  This means using B<Class-E<gt>function()> for functions
+and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
+your own modules, then that often means something like B<$self-E<gt>method()>. 
 
 =head1 PUBLIC FUNCTIONS AND METHODS
 
@@ -518,7 +519,7 @@ __END__
 
 =head1 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.  However, I do request that this copyright information remain
 attached to the file.  If you modify this module and redistribute a changed

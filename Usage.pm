@@ -10,7 +10,7 @@ site usage details, as well as e-mail backups of usage counts to the site owner.
 package CGI::WPM::Usage;
 require 5.004;
 
-# Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+# Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 # free software; you can redistribute it and/or modify it under the same terms as
 # Perl itself.  However, I do request that this copyright information remain
 # attached to the file.  If you modify this module and redistribute a changed
@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.32';
+$VERSION = '0.33';
 
 ######################################################################
 
@@ -34,17 +34,17 @@ $VERSION = '0.32';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.31
-	CGI::WPM::Globals 0.3
-	CGI::EventCountFile 1.01
+	CGI::WPM::Base 0.33
+	CGI::WPM::Globals 0.33
+	CGI::WPM::EventCountFile 1.04
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.31;
+use CGI::WPM::Base 0.33;
 @ISA = qw(CGI::WPM::Base);
-use CGI::EventCountFile 1.01;
+use CGI::WPM::EventCountFile 1.04;
 
 ######################################################################
 
@@ -144,8 +144,9 @@ I<This POD is coming when I get the time to write it.>
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions
-and B<$object-E<gt>method()> for methods.
+using object notation.  This means using B<Class-E<gt>function()> for functions
+and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
+your own modules, then that often means something like B<$self-E<gt>method()>. 
 
 =head1 PUBLIC FUNCTIONS AND METHODS
 
@@ -275,7 +276,7 @@ sub email_and_reset_counts_if_new_day {
 	$rh_prefs->{$PKEY_EMAIL_LOGS} or return( 1 );
 
 	$globals->add_no_error();
-	my $dcm_file = CGI::EventCountFile->new( 
+	my $dcm_file = CGI::WPM::EventCountFile->new( 
 		$globals->phys_filename_string( $rh_prefs->{$PKEY_FN_DCM} ), 1 );
 	$dcm_file->open_and_lock( 1 ) or do {
 		$globals->add_error( $dcm_file->is_error() );
@@ -305,7 +306,7 @@ sub email_and_reset_counts_if_new_day {
 
 		foreach my $filename (@{$ra_filenames}) {
 			$filename or next;
-			my $count_file = CGI::EventCountFile->new( 
+			my $count_file = CGI::WPM::EventCountFile->new( 
 				$globals->phys_filename_string( $filename ), 1 );
 			$count_file->open_and_lock( 1 ) or do {
 				push( @mail_body, "\n\n".$count_file->is_error()."\n" );
@@ -468,7 +469,7 @@ sub update_referrer_counts {
 		# else check if the referring domain is a search engine
 		foreach my $dom_frag (keys %{$rh_engines}) {
 			if( ".$domain." =~ m|[/\.]$dom_frag\.| ) {
-				my $se_query = CGI::HashOfArrays->new( 1, $query );
+				my $se_query = CGI::MultiValuedHash->new( 1, $query );
 				my @se_keywords;
 				
 				my $kwpn = $rh_engines->{$dom_frag};
@@ -514,7 +515,7 @@ sub update_one_count_file {
 
 	push( @keys_to_inc, $rh_prefs->{$PKEY_TOKEN_TOTAL} );
 
-	my $count_file = CGI::EventCountFile->new( 
+	my $count_file = CGI::WPM::EventCountFile->new( 
 		$globals->phys_filename_string( $filename ), 1 );
 	$count_file->open_and_lock( 1 ) or return( 0 );
 	$count_file->read_all_records();
@@ -535,7 +536,7 @@ __END__
 
 =head1 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.  However, I do request that this copyright information remain
 attached to the file.  If you modify this module and redistribute a changed
@@ -550,6 +551,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::EventCountFile.
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::EventCountFile.
 
 =cut

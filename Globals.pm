@@ -12,7 +12,7 @@ collecting and sending user output, and providing utilities like sending e-mail.
 package CGI::WPM::Globals;
 require 5.004;
 
-# Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+# Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 # free software; you can redistribute it and/or modify it under the same terms as
 # Perl itself.  However, I do request that this copyright information remain
 # attached to the file.  If you modify this module and redistribute a changed
@@ -20,7 +20,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.32';
+$VERSION = '0.33';
 
 ######################################################################
 
@@ -36,16 +36,16 @@ $VERSION = '0.32';
 
 =head2 Nonstandard Modules
 
-	CGI::WebUserIO 0.92
-	HTML::PageMaker 1.0
+	CGI::WPM::WebUserIO 0.93
+	CGI::WPM::PageMaker 1.01
 
 =cut
 
 ######################################################################
 
-use CGI::WebUserIO 0.92;
-use HTML::PageMaker 1.0;
-@ISA = qw( CGI::WebUserIO HTML::PageMaker );
+use CGI::WPM::WebUserIO 0.93;
+use CGI::WPM::PageMaker 1.01;
+@ISA = qw( CGI::WPM::WebUserIO CGI::WPM::PageMaker );
 
 ######################################################################
 
@@ -204,8 +204,9 @@ does, however, reflect uri changes (virtual resource path).
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions
-and B<$object-E<gt>method()> for methods.
+using object notation.  This means using B<Class-E<gt>function()> for functions
+and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
+your own modules, then that often means something like B<$self-E<gt>method()>. 
 
 =head1 FUNCTIONS AND METHODS
 
@@ -220,7 +221,7 @@ I<This POD is coming when I get the time to write it.>
 	initialize([ ROOT[, DELIM[, PREFS[, USER_INPUT]]] ])
 	clone([ CLONE ]) -- POD for this available below
 	
-	send_content_to_user([ CONTENT ]) -- overrides CGI::WebUserIO's version
+	send_content_to_user([ CONTENT ]) -- overrides CGI::WPM::WebUserIO's version
 
 	is_debug([ NEW_VALUE ])
 
@@ -360,8 +361,8 @@ sub new {
 sub initialize {
 	my ($self, $root, $delim, $prefs, $user_input) = @_;
 
-	$self->CGI::WebUserIO::initialize( $user_input );
-	$self->HTML::PageMaker::initialize();
+	$self->CGI::WPM::WebUserIO::initialize( $user_input );
+	$self->CGI::WPM::PageMaker::initialize();
 	
 	%{$self} = (
 		%{$self},
@@ -416,8 +417,8 @@ are not changed.
 sub clone {
 	my ($self, $clone, @args) = @_;
 	ref($clone) eq ref($self) or $clone = bless( {}, ref($self) );
-	$clone = $self->CGI::WebUserIO::clone( $clone );
-	$clone = $self->HTML::PageMaker::clone( $clone );
+	$clone = $self->CGI::WPM::WebUserIO::clone( $clone );
+	$clone = $self->CGI::WPM::PageMaker::clone( $clone );
 	
 	$clone->{$KEY_IS_DEBUG} = $self->{$KEY_IS_DEBUG};
 
@@ -449,7 +450,7 @@ sub clone {
 }
 
 ######################################################################
-# Override same-named method in CGI::WebUserIO to acknowledge that we 
+# Override same-named method in CGI::WPM::WebUserIO to acknowledge that we 
 # now store the page content within ourself.
 
 sub send_content_to_user {
@@ -950,7 +951,7 @@ __END__
 
 =head1 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.  However, I do request that this copyright information remain
 attached to the file.  If you modify this module and redistribute a changed
@@ -965,6 +966,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), HTML::PageMaker, CGI::WebUserIO, CGI::WPM::Base.
+perl(1), CGI::WPM::PageMaker, CGI::WPM::WebUserIO, CGI::WPM::Base.
 
 =cut

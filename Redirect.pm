@@ -10,7 +10,7 @@ an HTTP redirection header.
 package CGI::WPM::Redirect;
 require 5.004;
 
-# Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+# Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 # free software; you can redistribute it and/or modify it under the same terms as
 # Perl itself.  However, I do request that this copyright information remain
 # attached to the file.  If you modify this module and redistribute a changed
@@ -18,7 +18,7 @@ require 5.004;
 
 use strict;
 use vars qw($VERSION @ISA);
-$VERSION = '0.32';
+$VERSION = '0.33';
 
 ######################################################################
 
@@ -34,14 +34,14 @@ $VERSION = '0.32';
 
 =head2 Nonstandard Modules
 
-	CGI::WPM::Base 0.3
-	CGI::WPM::Globals 0.3
+	CGI::WPM::Base 0.33
+	CGI::WPM::Globals 0.33
 
 =cut
 
 ######################################################################
 
-use CGI::WPM::Base 0.3;
+use CGI::WPM::Base 0.33;
 @ISA = qw(CGI::WPM::Base);
 
 ######################################################################
@@ -77,8 +77,9 @@ that makes the site's pages.
 =head1 SYNTAX
 
 This class does not export any functions or methods, so you need to call them
-using indirect notation.  This means using B<Class-E<gt>function()> for functions
-and B<$object-E<gt>method()> for methods.
+using object notation.  This means using B<Class-E<gt>function()> for functions
+and B<$object-E<gt>method()> for methods.  If you are inheriting this class for
+your own modules, then that often means something like B<$self-E<gt>method()>. 
 
 =head1 PUBLIC FUNCTIONS AND METHODS
 
@@ -142,7 +143,7 @@ __END__
 
 =head1 AUTHOR
 
-Copyright (c) 1999-2000, Darren R. Duncan. All rights reserved. This module is
+Copyright (c) 1999-2001, Darren R. Duncan. All rights reserved. This module is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.  However, I do request that this copyright information remain
 attached to the file.  If you modify this module and redistribute a changed
@@ -157,6 +158,6 @@ Address comments, suggestions, and bug reports to B<perl@DarrenDuncan.net>.
 
 =head1 SEE ALSO
 
-perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WebUserIO.
+perl(1), CGI::WPM::Base, CGI::WPM::Globals, CGI::WPM::WebUserIO.
 
 =cut
