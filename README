@@ -1,0 +1,17 @@
+                     DYNAMIC WEBSITE GENERATOR
+----------------------------------------------------------------------
+
+by Darren Duncan <perl@DarrenDuncan.net>
+
+This distribution has been renamed to "duncand-prerelease" from
+"CGI-WebsiteGenerator" because the old name really isn't that appropriate.
+Largely this is because the modules are not properly documented and it is very
+difficult for new people to use them because of it.  The new name reflects that
+fact that what people see here is in-development product, and while this product
+does function, it is subject to change a lot and is poorly documented.
+
+The only reason that this file and its enclosing distribution exists is to blot
+out as much as possible the details of what this distribution was, due to the
+fact that listings are never deleted from search.cpan.org, but can only be
+covered up by newer versions.  If it is possible to delete distributions from the
+listings, then this document will no longer be necessary.
