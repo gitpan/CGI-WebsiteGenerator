@@ -1,5 +1,12 @@
 2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
 
+	* Release 0.3201.
+	
+	* Removed the ".txt" extensions from my ReadMe files, since they aren't 
+	pulled out by the CPAN documentation system otherwise.
+	
+2000-12-26   Darren Duncan <perl@DarrenDuncan.net>
+
 	* Release 0.32.
 	
 	* Added complete Synopsis POD to all the modules, as well as a few notes in 
@@ -36,6 +43,8 @@
 	
 	* I removed the demo website, which was horribly out of date.  One such as 
 	it will return later.
+	
+	* The "Manifest" was reformatted to be more machine friendly.
 	
 2000-11-14   Darren Duncan <perl@DarrenDuncan.net>
 
